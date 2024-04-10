@@ -1,0 +1,65 @@
+[
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "source.address",
+      "count": 8
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "http.request.method",
+      "count": 5
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "http.response.body.bytes",
+      "count": 5
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "http.response.status_code",
+      "count": 4
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "hostname",
+      "count": 2
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "message",
+      "count": 2
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "@timestamp",
+      "count": 1
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "url.original",
+      "count": 1
+    }
+  },
+  {
+    "index": "sample_docs",
+    "field": {
+      "name": "user_agent.original",
+      "count": 1
+    }
+  }
+]
