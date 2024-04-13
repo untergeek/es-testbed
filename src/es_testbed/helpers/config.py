@@ -65,7 +65,7 @@ def delete() -> dict:
         }
     }
 
-def generate_ilm(phases: list=['hot', 'delete'], repository=None) -> dict:
+def generate_ilm(phases: list=None, repository=None) -> dict:
     """Generate a full ILM policy based on which phases are passed"""
     policy = {"policy": {"phases": {}}}
     # We always have at least a hot and a delete phase

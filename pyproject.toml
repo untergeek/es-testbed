@@ -30,7 +30,7 @@ keywords = [
     'snapshot',
 ]
 dependencies = [
-    "es_client==8.13.0"
+    "es_client==8.13.1"
 ]
 
 [project.optional-dependencies]

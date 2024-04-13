@@ -17,6 +17,33 @@ MAPPING: dict = {
     }
 }
 
+NAMEMAPPER: dict = {
+    'index': 'idx',
+    'datastream': 'ds',
+    'component': 'cmp',
+    'ilm': 'ilm',
+    'template': 'tmpl',
+    'snapshot': 'snp',
+}
+
+TESTPLAN: dict = {
+    'type': 'indices',
+    'prefix': 'es-testbed',
+    'rollover_alias': False,
+    'ilm': {
+        'tiers': ['hot', 'delete'],
+        'forcemerge': False,
+        'max_num_segments': 1,
+        'repository': None,
+    },
+    'defaults': {
+        'entity_count': 3,
+        'docs': 10,
+        'match': True,
+        'searchable': None,
+    }
+}
+
 TIER: dict = {
     'hot': {
         'pref': 'data_hot,data_content'
@@ -26,13 +53,13 @@ TIER: dict = {
     },
     'cold': {
         'pref': 'data_cold,data_warm,data_hot,data_content',
-        'pfx': 'restored',
-        'sto': 'full_copy',
+        'prefix': 'restored',
+        'storage': 'full_copy',
     },
     'frozen': {
         'pref': 'data_frozen',
-        'pfx': 'partial',
-        'sto': 'shared_cache',
+        'prefix': 'partial',
+        'storage': 'shared_cache',
     }
 }
 

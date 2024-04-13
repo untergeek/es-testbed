@@ -1,7 +1,7 @@
 #!/bin/bash
 
-IMAGE=es_fieldusage_test
-RUNNAME=es_fieldusage_test8
+IMAGE=es_testbed_test
+RUNNAME=es_testbed_test8
 LOCAL_PORT=9200
 URL=http://127.0.0.1:${LOCAL_PORT}
 

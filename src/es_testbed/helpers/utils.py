@@ -1,7 +1,7 @@
 """Utility helper functions"""
 import random
 import string
-from es_testbed.defaults import ilm_force_merge, ilm_phase
+from es_testbed.defaults import ilm_force_merge, ilm_phase, MAPPING, TIER
 from es_testbed.exceptions import TestbedMisconfig
 
 def randomstr(length: int=16, lowercase: bool=False):
@@ -56,7 +56,7 @@ def build_ilm_phase(tier, actions=None, repository=None):
         phase[tier]['actions'].update(actions)
     return phase
 
-def build_ilm_policy(tiers=None, forcemerge=False, max_num_segments=1, repository=None):
+def build_ilm_policy(tiers: list=None, fmerge: bool=False, mns: int=1, repo: str=None):
     """
     Build a full ILM policy based on the provided tiers.
     Put forcemerge in the last tier before cold or frozen (whichever comes first)
@@ -64,10 +64,51 @@ def build_ilm_policy(tiers=None, forcemerge=False, max_num_segments=1, repositor
     if not tiers:
         tiers = ['hot', 'delete']
     phases = {}
-    if ('cold' in tiers or 'frozen' in tiers) and not repository:
+    if ('cold' in tiers or 'frozen' in tiers) and not repo:
         raise TestbedMisconfig('Cannot build cold or frozen phase without repository')
     for tier in tiers:
-        phases.update(build_ilm_phase(tier, repository=repository))
-    if forcemerge:
-        phases['hot']['actions'].update(ilm_force_merge(max_num_segments=max_num_segments))
-    return {'policy': {'phases': phases}}
+        phases.update(build_ilm_phase(tier, repository=repo))
+    if fmerge:
+        phases['hot']['actions'].update(ilm_force_merge(max_num_segments=mns))
+    return {'phases': phases}
+
+def ds_action_generator(datastream: str, index: str, action: str=None):
+    """Generate a single add or remove backing index action for a datastream"""
+    if not action or action not in ['add', 'remove']:
+        raise TestbedMisconfig('action must be "add" or "remove"')
+    return {
+        f'{action}_backing_index': {
+            'data_stream': datastream,
+            'index': index
+        }
+    }
+
+def get_routing(tier='hot'):
+    """Return the routing allocation tier preference"""
+    try:
+        pref = TIER[tier]['pref']
+    except KeyError:
+        # Fallback value
+        pref = 'data_content'
+    return {'index.routing.allocation.include._tier_preference': pref}
+
+def mapping_component():
+    """Return a mappings component template"""
+    return {'mappings': MAPPING}
+
+def mounted_name(index, tier):
+    """Return a value for renamed_index for mounting a searchable snapshot index"""
+    return f'{TIER[tier]["prefix"]}-{index}'
+
+def setting_component(ilm_policy: str=None, rollover_alias: str=None):
+    """Return a settings component template"""
+    val = {'settings':{}}
+    if ilm_policy:
+        val['settings']['index.lifecycle.name'] = ilm_policy
+    if rollover_alias:
+        val['settings']['index.lifecycle.rollover_alias'] = rollover_alias
+    return val
+
+def storage_type(tier):
+    """Return the storage type of a searchable snapshot by tier"""
+    return TIER[tier]["storage"]
