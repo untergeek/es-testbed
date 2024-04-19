@@ -2,14 +2,14 @@
 # pylint: disable=protected-access, import-error
 # add import-error here ^^^ to avoid false-positives for the local import
 from unittest import TestCase
-from es_testbed.defaults import ilm_class_defaults
-from es_testbed.classes.ilmbuilder import IlmBuilder
+from es_testbed.defaults import TESTPLAN
+from es_testbed.classes.ilm import IlmBuilder
 
 class TestDefaultFunctions(TestCase):
     """Ensure test coverage of simple functions that might be deprecated in the future"""
     def test_cls_ilm_defaults(self):
         """Ensure matching output"""
-        defaults = ilm_class_defaults()
+        defaults = TESTPLAN['ilm']
         ilm = IlmBuilder()
         self.assertEqual(ilm.tiers, defaults['tiers'])
         self.assertEqual(ilm.forcemerge, defaults['forcemerge'])

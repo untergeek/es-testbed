@@ -25,12 +25,14 @@ classifiers = [
 keywords = [
     'elasticsearch',
     'index',
+    'testing',
     'datastream',
     'repository',
     'snapshot',
 ]
 dependencies = [
-    "es_client==8.13.1"
+    "es_client==8.13.1",
+    "es-wait==0.1.4",
 ]
 
 [project.optional-dependencies]
@@ -73,6 +75,11 @@ cov = [
 
 [[tool.hatch.envs.all.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+[tool.hatch.envs.test.scripts]
+test = "pytest"
+test-cov = "pytest --cov=es_testbed"
+cov-report = "pytest --cov=es_testbed --cov-report html:cov_html"
 
 [tool.hatch.envs.lint]
 detached = true
@@ -192,3 +199,7 @@ dependencies = [
     "pytest >=7.2.1",
     "pytest-cov",
 ]
+
+[publish.index.repos.main]
+url = "https://upload.pypi.org/legacy/"
+username = "__token__"

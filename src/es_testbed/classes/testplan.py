@@ -1,21 +1,33 @@
 """TestPlan Class Definition"""
-from es_testbed.classes.ilmbuilder import IlmBuilder
+import typing as t
+from es_testbed.exceptions import TestPlanMisconfig
 from es_testbed.defaults import TESTPLAN
-from es_testbed.helpers.utils import randomstr
+from es_testbed.helpers.utils import randomstr, getlogger
+from .args import Args
+from .ilm import IlmBuilder
 # pylint: disable=missing-docstring
 
-class TestPlan:
-    def __init__(self, planbook: dict=None):
-        self.type = TESTPLAN['indices']
-        self.prefix = TESTPLAN['prefix']
-        self.rollover_alias = TESTPLAN['rollover_alias']
-        self.uniq = randomstr(length=8, lowercase=True)
+class TestPlan(Args):
+    def __init__(
+            self,
+            settings: t.Dict[str, t.Any] = None,
+            defaults: t.Dict[str, t.Any] = None,
+        ):
+        if defaults is None:
+            defaults = TESTPLAN
+        super().__init__(settings=settings, defaults=defaults)
+        self.logger = getlogger('es_testbed.TestPlan')
         self.entities = []
-        self.ilm = IlmBuilder()
-        self.planbook = planbook
-        self.bookbuild()
-        ### Example planbook
-        # planbook={
+        self.ilm = False
+        self.uniq = randomstr(length=8, lowercase=True)
+        self.update_settings(settings)
+        self.logger.debug('settings = %s', self.asdict)
+        self.update_ilm()
+        if not self.entities:
+            self.make_default_entities()
+
+        ### Example settings
+        # settings={
         #   'type': 'indices', # Default is indices? Or should it be datastreams?
         #   'prefix': 'es-testbed', # Provide this value as a default
         #   'rollover_alias': True, # Only respected if 'type' == 'indices'.
@@ -60,40 +72,62 @@ class TestPlan:
         # }
     def add_entity(
             self,
-            docs: int=10,
-            match: bool=True,
-            searchable: str=None
-        ):
+            docs: t.Optional[int] = 10,
+            match: t.Optional[bool] = True,
+            searchable: t.Optional[str] = None
+        ) -> None:
         entity = {'docs': docs, 'match': match}
         if searchable:
             entity['searchable'] = searchable
         self.entities.append(entity)
 
-    def bookbuild(self):
-        if self.planbook:
-            autokeys = ['type', 'prefix', 'uniq', 'rollover_alias', 'entities']
-            for dkey in autokeys:
-                if dkey in self.planbook:
-                    setattr(self, dkey, self.planbook[dkey])
-            if not self.entities:
-                self.make_default_entities()
-            self.update_ilm()
-
-    def make_default_entities(self):
-        defs = TESTPLAN['defaults']
-        if 'defaults' in self.planbook and self.planbook['defaults']:
-            defs = self.planbook['defaults']
+    def make_default_entities(self) -> None:
+        if self.settings and isinstance(self.settings, dict):
+            if 'defaults' in self.settings:
+                defs = self.settings['defaults']
         kwargs = {'docs': defs['docs'], 'match': defs['match'], 'searchable': defs['searchable']}
         for _ in range(0, defs['entity_count']):
             self.add_entity(**kwargs)
+        self.logger.debug('Created %s entities', len(self.entities))
+        # if 'defaults' in self.settings:
+        #     defs = self.settings['defaults']
 
-    def update_ilm(self):
-        if 'ilm' in self.planbook:
-            for k,v in self.planbook.items():
+    def update_ilm(self) -> None:
+        if self.use_ilm():
+            self.ilm = IlmBuilder() # Set defaults
+            for k,v in self.settings['ilm'].items():
+                self.logger.debug('IlmBuilder.%s = %s', k, v)
                 setattr(self.ilm, k, v)
-        # If cold or frozen tiers weren't included in planbook['tiers'], we manually correct here
-        for entity in self.entities:
-            if 'searchable' in entity and entity['searchable'] is not None:
-                if not entity['searchable'] in self.ilm.tiers:
-                    self.ilm.tiers.append(entity['searchable'])
+            # If cold or frozen tiers weren't included in settings['ilm']['tiers']
+            # we manually correct here
+            for entity in self.entities:
+                if 'searchable' in entity and entity['searchable'] is not None:
+                    if not entity['searchable'] in self.ilm.tiers:
+                        self.ilm.tiers.append(entity['searchable'])
+        self.logger.debug('ILM settings = %s',
+            self.ilm.asdict if isinstance(self.ilm, IlmBuilder) else self.ilm)
 
+
+    def use_ilm(self) -> bool:
+        use_ilm = False
+        self.logger.debug('INIT: use_ilm = %s', use_ilm)
+        if 'ilm' in self.settings:
+            if isinstance(self.settings['ilm'], dict): # It's a dictionary, not a bool
+                self.logger.debug('settings["ilm"] is a dictionary')
+                use_ilm = True
+            elif isinstance(self.settings['ilm'], bool):
+                self.logger.debug('settings["ilm"] is a bool')
+                use_ilm = self.settings['ilm'] # Accept whatever the boolean value is
+            elif self.settings['ilm'] is None: # Empty dict is truthy, but is not None
+                self.logger.debug('settings["ilm"] is None')
+                use_ilm = False
+        if self.entities:
+            # Detect if cold or frozen tiers were included in settings['ilm']['tiers']
+            for entity in self.entities:
+                if 'searchable' in entity and entity['searchable'] is not None:
+                    self.logger.debug('Test entities contain searchable snapshots')
+                    if not use_ilm:
+                        raise TestPlanMisconfig(
+                            'Searchable entities were found, but ILM is disabled')
+        self.logger.debug('FINAL: use_ilm = %s', use_ilm)
+        return use_ilm

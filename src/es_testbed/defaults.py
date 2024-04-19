@@ -1,13 +1,21 @@
 """Default values and constants"""
-
+import typing as t
 # pylint: disable=E1120
 
 EPILOG: str = 'Learn more at https://github.com/untergeek/es-testbed'
 
 HELP_OPTIONS: dict = {'help_option_names': ['-h', '--help']}
 
+ARGSCLASSES: list = ['IlmBuilder', 'IlmExplain', 'TestPlan']
+
+COLD_PREFIX: str = 'restored-'
+FROZEN_PREFIX: str = 'partial-'
+
+SS_PREFIX: t.Dict[str, str] = {'cold': COLD_PREFIX, 'frozen': FROZEN_PREFIX}
+
 MAPPING: dict = {
     'properties': {
+        '@timestamp': {'type': 'date'},
         'message': {'type': 'keyword'},
         'number': {'type': 'long'},
         'nested': {'properties': {'key': {'type': 'keyword'}}},
@@ -70,14 +78,14 @@ def ilm_phase(tier):
             'actions': {
                 'rollover': {
                     'max_primary_shard_size': '1gb',
-                    'max_age': '10m'
+                    'max_age': '1d'
                 }
             }
         },
-        'warm': {'min_age': '30m', 'actions': {}},
-        'cold': {"min_age": "1h", "actions": {}},
-        'frozen': {"min_age": "2h", "actions": {}},
-        'delete': {"min_age": "3h", "actions": {"delete": {}}}   
+        'warm': {'min_age': '2d', 'actions': {}},
+        'cold': {"min_age": "3d", "actions": {}},
+        'frozen': {"min_age": "4d", "actions": {}},
+        'delete': {"min_age": "5d", "actions": {"delete": {}}}   
     }
     return {tier: phase_map[tier]}
 
