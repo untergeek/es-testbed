@@ -8,7 +8,7 @@ from .snapshotmgr import SnapshotMgr
 from ..entities import Alias, Index
 from ..testplan import TestPlan
 
-# pylint: disable=missing-docstring,too-many-arguments
+# pylint: disable=missing-docstring,too-many-arguments,broad-exception-caught
 
 class IndexMgr(EntityMgr):
     def __init__(
@@ -37,28 +37,14 @@ class IndexMgr(EntityMgr):
     def indexlist(self) -> t.Sequence[str]:
         return [x.name for x in self.entity_list]
 
-    def track_alias(self):
-        self.logger.debug('Tracking alias: %s', self.aliasname)
-        self.alias = Alias(client=self.client, name=self.aliasname)
-
-    def track_index(self, name: str) -> None:
-        self.logger.debug('Tracking index: %s', name)
-        entity = Index(
-            client=self.client,
-            name=name,
-            snapmgr=self.snapmgr,
-            policy_name=self.policy_name
-        )
-        self.entity_list.append(entity)
-
-    def add(self, value):
+    def add(self, value) -> None:
         # In this case, value is a single array element from plan.entities
         self.logger.debug('Creating index: %s', value)
         es_api.create_index(self.client, value)
         self.filler(value)
         self.track_index(value)
 
-    def add_rollover(self):
+    def add_rollover(self) -> None:
         settings = setting_component(
             ilm_policy=self.policy_name, rollover_alias=self.aliasname)['settings']
         aliascfg = {self.aliasname: {'is_write_index': True}}
@@ -81,7 +67,7 @@ class IndexMgr(EntityMgr):
         if not self.alias.verify(created):
             self.logger.error('Unable to confirm rollover of alias "%s" was successfully executed')
 
-    def filler(self, scheme):
+    def filler(self, scheme) -> None:
         """If the scheme from the TestPlan says to write docs, do it"""
         # scheme is a single array element from plan.entities
         self.logger.debug('Adding docs to %s', self.name)
@@ -95,12 +81,12 @@ class IndexMgr(EntityMgr):
             )
         self.doc_incr += scheme['docs']
 
-    def searchable(self):
+    def searchable(self) -> None:
         """If the indices were marked as searchable snapshots, we do that now"""
         for idx, scheme in enumerate(self.plan.entities):
             self.entity_list[idx].mount_ss(scheme)
 
-    def setup(self):
+    def setup(self) -> None:
         self.logger.debug('Beginning setup...')
         if self.plan.rollover_alias:
             self.logger.debug('rollover_alias is True...')
@@ -112,14 +98,16 @@ class IndexMgr(EntityMgr):
         self.logger.info('Successfully created indices: %s', self.indexlist)
         self.success = True
 
-    def teardown(self):
-        if not self.success:
-            msg = (
-                'Setup did not complete successfully. '
-                'Manual cleanup of indices may be necessary.'
-            )
-            self.logger.warning(msg)
-            return
-        self.logger.info('Cleaning up indices...')
-        es_api.delete(self.client, 'index', ','.join(self.indexlist))
-        self.logger.info('Cleanup of indices completed.')
+    def track_alias(self) -> None:
+        self.logger.debug('Tracking alias: %s', self.aliasname)
+        self.alias = Alias(client=self.client, name=self.aliasname)
+
+    def track_index(self, name: str) -> None:
+        self.logger.debug('Tracking index: %s', name)
+        entity = Index(
+            client=self.client,
+            name=name,
+            snapmgr=self.snapmgr,
+            policy_name=self.policy_name
+        )
+        self.entity_list.append(entity)

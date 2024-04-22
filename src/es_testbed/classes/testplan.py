@@ -19,6 +19,7 @@ class TestPlan(Args):
         self.logger = getlogger('es_testbed.TestPlan')
         self.entities = []
         self.ilm = False
+        self.prefix = None
         self.uniq = randomstr(length=8, lowercase=True)
         self.update_settings(settings)
         self.logger.debug('settings = %s', self.asdict)
@@ -28,7 +29,7 @@ class TestPlan(Args):
 
         ### Example settings
         # settings={
-        #   'type': 'indices', # Default is indices? Or should it be datastreams?
+        #   'type': 'indices', # Default is indices? Or should it be data_streams?
         #   'prefix': 'es-testbed', # Provide this value as a default
         #   'rollover_alias': True, # Only respected if 'type' == 'indices'.
         #                         # Will rollover after creation and filling
@@ -41,7 +42,7 @@ class TestPlan(Args):
         #   }
         #
         #   # If these keys aren't specified per entity, then all entities will get this treatment
-        #   # EXCEPT for the is_write_index for aliases and datastreams
+        #   # EXCEPT for the is_write_index for aliases and data_streams
         #
         #   'defaults': {
         #     'entity_count': 3,

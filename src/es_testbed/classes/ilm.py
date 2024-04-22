@@ -1,12 +1,14 @@
 """ILM Defining Class"""
 import typing as t
+from os import getenv
 from time import sleep
 from elasticsearch8 import Elasticsearch
-from es_testbed.defaults import TESTPLAN
+from es_testbed.defaults import TESTPLAN, PAUSE_ENVVAR, PAUSE_DEFAULT
 from es_testbed.exceptions import NameChanged, ResultNotExpected, TestbedMisconfig
 from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import build_ilm_policy, getlogger
 from .args import Args
+PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 
 # pylint: disable=missing-docstring
 class IlmBuilder(Args):
@@ -174,9 +176,9 @@ class IlmTracker:
 
     def count_logging(self, counter: int) -> None:
         # Send a message every 10 loops
-        if counter % 10 == 0:
+        if counter % 40 == 0:
             self.logger.info('Still working... Explain: %s', self._explain.asdict)
-        if counter == 120:
+        if counter == 480:
             msg = 'Taking too long! Giving up on waiting'
             self.logger.critical(msg)
             raise ResultNotExpected(msg)
@@ -235,7 +237,7 @@ class IlmTracker:
             self.logger.debug('Passing along upstream exception...')
             raise NameChanged from err
 
-    def wait4complete(self):
+    def wait4complete(self) -> None:
         counter = 0
         self.logger.debug('Waiting for current action and step to complete')
         self.logger.debug('Action: %s --- Step: %s', self._explain.action, self._explain.step)
@@ -243,8 +245,8 @@ class IlmTracker:
                     self._explain.action == 'complete' and
                     self._explain.step == 'complete'):
             counter += 1
-            sleep(1)
-            if counter % 3 == 0:
+            sleep(PAUSE_VALUE)
+            if counter % 10 == 0:
                 self.logger.debug(
                     'Action: %s --- Step: %s', self._explain.action, self._explain.step)
             try:

@@ -32,7 +32,7 @@ keywords = [
 ]
 dependencies = [
     "es_client==8.13.1",
-    "es-wait==0.1.4",
+    "es-wait==0.2.2",
 ]
 
 [project.optional-dependencies]

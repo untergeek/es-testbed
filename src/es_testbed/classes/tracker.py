@@ -3,7 +3,7 @@ import typing as t
 from elasticsearch8 import Elasticsearch
 from es_testbed.helpers.utils import getlogger
 from .entitymgrs import (
-    ComponentMgr, DatastreamMgr, IlmMgr, IndexMgr, SnapshotMgr, TemplateMgr)
+    ComponentMgr, DataStreamMgr, IlmMgr, IndexMgr, SnapshotMgr, TemplateMgr)
 from  .testplan import TestPlan
 
 # pylint: disable=missing-docstring,too-many-instance-attributes
@@ -45,7 +45,7 @@ class Tracker:
             client=self.client,
             plan=self.plan,
             components=self.components.entity_list,
-            is_ds=self.plan.type == 'datastreams'
+            is_ds=self.plan.type == 'data_streams'
         )
         self.snapshots = SnapshotMgr(
             client=self.client,
@@ -54,9 +54,9 @@ class Tracker:
         if self.plan.type == 'indices':
             self.logger.debug('Tracker.entities will be IndexMgr')
             etype = IndexMgr
-        elif self.plan.type == 'datastreams':
-            self.logger.debug('Tracker.entities will be DatastreamMgr')
-            etype = DatastreamMgr
+        elif self.plan.type == 'data_streams':
+            self.logger.debug('Tracker.entities will be DataStreamMgr')
+            etype = DataStreamMgr
         self.entities = etype(
             client=self.client,
             plan=self.plan,
@@ -67,6 +67,6 @@ class Tracker:
     def teardown(self):
         self.entities.teardown()
         self.snapshots.teardown()
+        self.ilm_policies.teardown()
         self.templates.teardown()
         self.components.teardown()
-        self.ilm_policies.teardown()

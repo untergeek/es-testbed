@@ -29,6 +29,7 @@ class TestBed:
     def setup(self):
         """Setup the instance"""
         start = datetime.now(timezone.utc)
+        self.logger.info('Setting: %s', self.ilm_polling(interval='1s'))
         self.client.cluster.put_settings(persistent=self.ilm_polling(interval='1s'))
         self.tracker.setup()
         end = datetime.now(timezone.utc)
@@ -38,6 +39,7 @@ class TestBed:
         """Tear down anything we created"""
         start = datetime.now(timezone.utc)
         self.tracker.teardown()
+        self.logger.info('Restoring ILM polling to default: %s', self.ilm_polling(interval=None))
         self.client.cluster.put_settings(persistent=self.ilm_polling(interval=None))
         end = datetime.now(timezone.utc)
         self.logger.info('Testbed teardown elapsed time: %s', (end - start).total_seconds())

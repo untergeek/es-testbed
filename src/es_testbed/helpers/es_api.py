@@ -1,53 +1,72 @@
 """Functions that make Elasticsearch API Calls"""
 import typing as t
+from os import getenv
 from elasticsearch8 import Elasticsearch, exceptions as esx
 from es_wait import Exists, Snapshot
-from es_testbed.defaults import MAPPING
+from es_testbed.defaults import MAPPING, PAUSE_DEFAULT, PAUSE_ENVVAR
 from es_testbed import exceptions as exc
 from es_testbed.helpers.utils import doc_gen, get_routing, getlogger, mounted_name, storage_type
 LOGGER = getlogger(__name__)
+PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 # pylint: disable=broad-except
 
-def emap(kind: str, key: str, es: Elasticsearch):
+def emap(kind: str, es: Elasticsearch, value=None):
     """Return a value from a dictionary"""
     _ = {
         'alias': {
             'delete': es.indices.delete_alias,
             'exists': es.indices.exists_alias,
+            'get': es.indices.get_alias,
+            'kwargs': {'index': value, 'expand_wildcards': ['open', 'closed']},
             'plural': 'alias(es)'
         },
-        'datastream': {
+        'data_stream': {
             'delete': es.indices.delete_data_stream,
             'exists': es.indices.exists,
-            'plural': 'datastream(s)'
+            'get': es.indices.get_data_stream,
+            'kwargs': {'name': value, 'expand_wildcards': ['open', 'closed']},
+            'plural': 'data_stream(s)',
+            'key': 'data_streams',
         },
         'index': {
             'delete': es.indices.delete,
             'exists': es.indices.exists,
+            'get': es.indices.get,
+            'kwargs': {'index': value, 'expand_wildcards': ['open', 'closed']},
             'plural': 'index(es)'
         },
         'template': {
             'delete': es.indices.delete_index_template,
             'exists': es.indices.exists_index_template,
-            'plural': 'index template(s)'
+            'get': es.indices.get_index_template,
+            'kwargs': {'name': value},
+            'plural': 'index template(s)',
+            'key': 'index_templates',
         },
         'ilm': {
             'delete': es.ilm.delete_lifecycle,
             'exists': es.ilm.get_lifecycle,
+            'get': es.ilm.get_lifecycle,
+            'kwargs': {'name': value},
             'plural': 'ilm policy(ies)'
         },
         'component': {
             'delete': es.cluster.delete_component_template,
             'exists': es.cluster.exists_component_template,
-            'plural': 'component template(s)'
+            'get': es.cluster.get_component_template,
+            'kwargs': {'name': value},
+            'plural': 'component template(s)',
+            'key': 'component_templates',
         },
         'snapshot': {
             'delete': es.snapshot.delete,
             'exists': es.snapshot.get,
+            'get': es.snapshot.get,
+            'kwargs': {},
             'plural': 'snapshot(s)'
         }
     }
-    return _[kind][key]
+    return _[kind]
 
 def change_ds(client: Elasticsearch, actions: dict=None) -> None:
     """Change/Modify/Update a datastream"""
@@ -56,11 +75,11 @@ def change_ds(client: Elasticsearch, actions: dict=None) -> None:
     except Exception as err:
         raise exc.ResultNotExpected(f'Unable to modify datastreams. {err}') from err
 
-def create_datastream(client: Elasticsearch, name: str) -> None:
+def create_data_stream(client: Elasticsearch, name: str) -> None:
     """Create a datastream"""
     try:
         client.indices.create_data_stream(name=name)
-        test = Exists(client, name=name, kind='datastream')
+        test = Exists(client, name=name, kind='datastream', pause=PAUSE_VALUE)
         test.wait_for_it()
     except Exception as err:
         raise exc.TestbedFailure(
@@ -85,7 +104,7 @@ def create_index(
         settings=settings
     )
     try:
-        test = Exists(client, name=name, kind='index')
+        test = Exists(client, name=name, kind='index', pause=PAUSE_VALUE)
         test.wait_for_it()
     except exc.TimeoutException as err:
         raise exc.ResultNotExpected(f'Failed to create index {name}') from err
@@ -93,7 +112,8 @@ def create_index(
 
 def delete(client: Elasticsearch, kind: str, name: str, repository: str=None):
     """Delete the named object of type kind"""
-    func = emap(kind, 'delete', es=client)
+    which = emap(kind, client)
+    func = which['delete']
     if name is None: # Typically only with ilm
         LOGGER.debug('"%s" has a None value for name', kind)
         return
@@ -111,7 +131,7 @@ def delete(client: Elasticsearch, kind: str, name: str, repository: str=None):
     if exists(client, kind, name, repository=repository):
         LOGGER.critical('Unable to delete "%s" %s', kind, name)
         raise exc.ResultNotExpected(f'{kind} "{name}" still exists.')
-    LOGGER.info('Successfully deleted %s: "%s"', emap(kind, 'plural', client), name)
+    LOGGER.info('Successfully deleted %s: "%s"', which['plural'], name)
 
 def do_snap(client: Elasticsearch, repo: str, snap: str, idx: str, tier: str='cold') -> None:
     """Perform a snapshot"""
@@ -130,13 +150,13 @@ def exists(client: Elasticsearch, kind: str, name: str, repository: str=None) ->
     if name is None:
         return False
     retval = True
-    func = emap(kind, 'exists', es=client)
+    func = emap(kind, client)['exists']
     try:
         if kind == 'snapshot':
             retval = func(snapshot=name, repository=repository)
         elif kind == 'ilm':
             retval = func(name=name)
-        elif kind in ['index', 'datastream']:
+        elif kind in ['index', 'data_stream']:
             retval = func(index=name)
         else:
             retval = func(name=name)
@@ -192,6 +212,26 @@ def fix_aliases(client: Elasticsearch, oldidx: str, newidx: str) -> None:
     # Add the original index name as an alias to the mounted index
     client.indices.put_alias(index=f'{newidx}', name=oldidx)
 
+def get(client: Elasticsearch, kind: str, pattern: str) -> t.Sequence[str]:
+    """get any/all objects of type kind matching pattern"""
+    if pattern is None:
+        msg = f'"{kind}" has a None value for pattern'
+        LOGGER.error(msg)
+        raise exc.TestbedMisconfig(msg)
+    which = emap(kind, client, value=pattern)
+    func = which['get']
+    kwargs = which['kwargs']
+    try:
+        result = func(**kwargs)
+    except Exception as err:
+        raise exc.ResultNotExpected(f'Unexpected result: {err}') from err
+    if kind in ['data_stream', 'template', 'component']:
+        retval = [x['name'] for x in result[which['key']]]
+    else:
+        # ['alias', 'ilm', 'index']
+        retval = list(result.keys())
+    return retval
+
 def get_aliases(client: Elasticsearch, name: str) -> t.Sequence[str]:
     """Get aliases from index 'name'"""
     res = client.indices.get(index=name)
@@ -201,13 +241,16 @@ def get_aliases(client: Elasticsearch, name: str) -> t.Sequence[str]:
         retval = None
     return retval
 
-def get_backing_indices(client: Elasticsearch, name: str) -> list:
+def get_backing_indices(client: Elasticsearch, name: str) -> t.Sequence[str]:
     """Get the backing indices from the named data_stream"""
     resp = resolver(client, name)
     data_streams = resp['data_streams']
-    if len(data_streams) > 1:
-        raise exc.ResultNotExpected(f'Expected only a single data_stream matching {name}')
-    return data_streams[0]['backing_indices']
+    retval = []
+    if data_streams:
+        if len(data_streams) > 1:
+            raise exc.ResultNotExpected(f'Expected only a single data_stream matching {name}')
+        retval = data_streams[0]['backing_indices']
+    return retval
 
 def get_ds_current(client: Elasticsearch, name: str) -> str:
     """
@@ -220,11 +263,21 @@ def get_ds_current(client: Elasticsearch, name: str) -> str:
         retval = backers[-1]
     return retval
 
+def get_ilm(client: Elasticsearch, pattern: str) -> t.Union[t.Dict[str,str], None]:
+    """Get any ILM entity in ES that matches pattern"""
+    try:
+        return client.ilm.get_lifecycle(name=pattern)
+    except Exception as err:
+        msg = f'Unable to get ILM lifecycle matching {pattern}. Error: {err}'
+        LOGGER.critical(msg)
+        raise exc.ResultNotExpected(msg) from err
+
 def get_ilm_phases(client: Elasticsearch, name: str) -> dict:
     """Return the policy/phases part of the ILM policy identified by 'name'"""
+    ilm = get_ilm(client, name)
     try:
-        return client.ilm.get_lifecycle(name=name)[name]['policy']['phases']
-    except Exception as err:
+        return ilm[name]['policy']['phases']
+    except KeyError as err:
         msg = f'Unable to get ILM lifecycle named {name}. Error: {err}'
         LOGGER.critical(msg)
         raise exc.ResultNotExpected(msg) from err
@@ -292,7 +345,7 @@ def put_comp_tmpl(client: Elasticsearch, name: str, component: dict) -> None:
     """Publish a component template"""
     try:
         client.cluster.put_component_template(name=name, template=component, create=True)
-        test = Exists(client, name=name, kind='component')
+        test = Exists(client, name=name, kind='component', pause=PAUSE_VALUE)
         test.wait_for_it()
     except Exception as err:
         raise exc.TestbedFailure(
@@ -310,7 +363,7 @@ def put_idx_tmpl(
             index_patterns=index_patterns,
             create=True,
         )
-        test = Exists(client, name=name, kind='template')
+        test = Exists(client, name=name, kind='template', pause=PAUSE_VALUE)
         test.wait_for_it()
     except Exception as err:
         raise exc.TestbedFailure(

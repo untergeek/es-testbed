@@ -34,6 +34,10 @@ class IlmMgr(EntityMgr):
         if self.autobuild:
             self.setup()
 
+    @property
+    def logdisplay(self) -> str:
+        return 'ILM policy'
+
     def setup(self):
         if isinstance(self.ilm, IlmBuilder):
             es_api.put_ilm(self.client, self.name, policy=self.ilm.policy)
@@ -47,13 +51,3 @@ class IlmMgr(EntityMgr):
             self.entity_list.append(None)
             self.logger.info('No ILM policy created.')
         self.success = True
-
-    def teardown(self):
-        if not self.entity_list:
-            self.logger.info('No ILM policies to clean up.')
-            return
-        for policy in self.entity_list:
-            self.logger.info('Cleaning up ILM policies...')
-            if policy is not None:
-                es_api.delete(self.client, 'ilm', policy)
-        self.logger.info('Cleanup of ILM policies completed.')

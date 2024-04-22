@@ -1,14 +1,16 @@
 """Index Entity Class"""
 import typing as t
-from time import sleep
+from os import getenv
 from elasticsearch8 import Elasticsearch
 from es_wait import Exists
+from es_testbed.defaults import PAUSE_DEFAULT, PAUSE_ENVVAR
 from es_testbed.exceptions import NameChanged, ResultNotExpected
 from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import getlogger, mounted_name
 from .entity import Entity
 # from ..entitymgrs import SnapshotMgr
 from ..ilm import IlmTracker
+PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 
 # pylint: disable=missing-docstring,too-many-arguments
 
@@ -62,7 +64,7 @@ class Index(Entity):
             # At this point, it's "in" a searchable tier, but the index name hasn't changed yet
             newidx = mounted_name(self.name, target)
             self.logger.debug('Waiting for ILM phase change to complete. New index: %s', newidx)
-            test = Exists(self.client, name=newidx, kind='index')
+            test = Exists(self.client, name=newidx, kind='index', pause=PAUSE_VALUE)
             test.wait_for_it()
             self.logger.info('ILM advance to phase %s completed', target)
             self.aka.append(self.name) # Append the old name to the AKA list
@@ -97,7 +99,7 @@ class Index(Entity):
             # At this point, it's "in" a searchable tier, but the index name hasn't changed yet
             newidx = mounted_name(self.name, target)
             self.logger.debug('Waiting for ILM phase change to complete. New index: %s', newidx)
-            test = Exists(self.client, name=newidx, kind='index')
+            test = Exists(self.client, name=newidx, kind='index', pause=PAUSE_VALUE)
             test.wait_for_it()
             try:
                 self.ilm_tracker.wait4complete()
@@ -124,5 +126,4 @@ class Index(Entity):
         """
         if self.policy_name:
             self.ilm_tracker = IlmTracker(self.client, name)
-            sleep(2) # ILM is set to poll every 1 second, so we'll try every second
             self.ilm_tracker.update()

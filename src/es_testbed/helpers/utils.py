@@ -1,7 +1,9 @@
 """Utility helper functions"""
+import typing as t
 import random
 import string
 import logging
+from copy import deepcopy
 from datetime import datetime, timezone
 from es_testbed.defaults import ilm_force_merge, ilm_phase, MAPPING, TIER
 from es_testbed.exceptions import TestbedMisconfig
@@ -75,13 +77,13 @@ def doc_gen(count=10, start_at=0, match=True):
             }
         }
 
-def ds_action_generator(datastream: str, index: str, action: str=None):
-    """Generate a single add or remove backing index action for a datastream"""
+def ds_action_generator(data_stream: str, index: str, action: str=None):
+    """Generate a single add or remove backing index action for a data_stream"""
     if not action or action not in ['add', 'remove']:
         raise TestbedMisconfig('action must be "add" or "remove"')
     return {
         f'{action}_backing_index': {
-            'data_stream': datastream,
+            'data_stream': data_stream,
             'index': index
         }
     }
@@ -137,12 +139,40 @@ def mounted_name(index, tier):
     """Return a value for renamed_index for mounting a searchable snapshot index"""
     return f'{TIER[tier]["prefix"]}-{index}'
 
+def posmatch(original: t.Sequence[str], compare: t.Sequence[str]) -> t.Sequence[int]:
+    """
+    Compare the values in compare with original. Return a list of index positions from
+    compare of any values that match.
+    """
+    logger = getlogger(__name__)
+    positions = []
+    for orig in original:
+        for idx, comp in enumerate(compare):
+            if comp == orig:
+                logger.debug('Value %s found in both original and compare', comp)
+                positions.append(idx)
+    return positions
+
 def randomstr(length: int=16, lowercase: bool=False):
     """Generate a random string"""
     letters = string.ascii_uppercase
     if lowercase:
         letters = string.ascii_lowercase
     return str(''.join(random.choices(letters + string.digits, k=length)))
+
+def remove_by_index(original: t.Sequence[str], compare: t.Sequence[str]) -> t.Sequence[str]:
+    """By list index position, remove entries from compare which also exist in original"""
+    logger = getlogger(__name__)
+    positions = posmatch(original, compare)
+    if not positions:
+        logger.debug('No matching values to remove')
+        return compare
+    # If you del list[0] first, you get a new list[0]
+    # We need to delete from the highest index value to the lowest
+    positions.sort() # Sort first to ensure lowest to highest order
+    for idx in reversed(positions): # Reverse the list and iterate
+        del compare[idx] # Delete the value at position idx
+    return compare
 
 def setting_component(ilm_policy: str=None, rollover_alias: str=None):
     """Return a settings component template"""
@@ -156,3 +186,12 @@ def setting_component(ilm_policy: str=None, rollover_alias: str=None):
 def storage_type(tier):
     """Return the storage type of a searchable snapshot by tier"""
     return TIER[tier]["storage"]
+
+def uniq_values(original: t.Sequence[str], compare: t.Sequence[str]) -> t.Sequence[str]:
+    """Return any values unique to list 'compare'"""
+    logger = getlogger(__name__)
+    # Use deepcopy of compare so we don't change the original
+    uniq = remove_by_index(original, deepcopy(compare))
+    if uniq:
+        logger.debug('Values found only in compare: %s', uniq)
+    return uniq

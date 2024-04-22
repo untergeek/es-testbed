@@ -25,13 +25,21 @@ MAPPING: dict = {
     }
 }
 
-NAMEMAPPER: dict = {
+NAMEMAPPER: t.Dict[str, str] = {
     'index': 'idx',
-    'datastream': 'ds',
+    'data_stream': 'ds',
     'component': 'cmp',
     'ilm': 'ilm',
     'template': 'tmpl',
     'snapshot': 'snp',
+}
+
+PAUSE_DEFAULT: str = '0.25'
+PAUSE_ENVVAR: str = 'ES_TESTBED_PAUSE'
+
+PLURALMAP: t.Dict[str, str] = {
+    'ilm': 'ILM Policie',
+    'index': 'indice',
 }
 
 TESTPLAN: dict = {

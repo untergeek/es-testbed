@@ -29,10 +29,14 @@ class TemplateMgr(EntityMgr):
     def get_pattern(self, kind: str) -> str:
         return f'{self.plan.prefix}-{self.ident(dkey=kind)}-{self.plan.uniq}'
 
+    @property
+    def logdisplay(self) -> str:
+        return 'index template'
+
     def setup(self):
         patterns = []
         patterns.append(f"{self.get_pattern('index')}*")
-        patterns.append(f"{self.get_pattern('datastream')}*")
+        patterns.append(f"{self.get_pattern('data_stream')}*")
         es_api.put_idx_tmpl(
             self.client,
             self.name,
@@ -46,12 +50,3 @@ class TemplateMgr(EntityMgr):
         self.entity_list.append(self.name)
         self.logger.debug('Successfully created index template: %s', self.last)
         self.success = True
-
-    def teardown(self):
-        if not self.success:
-            self.logger.warning('Setup was unsuccessful, so there appear to be no index templates')
-            return
-        self.logger.info('Cleaning up index templates...')
-        for template in self.entity_list:
-            es_api.delete(self.client, 'template', template)
-        self.logger.info('Index template cleanup complete.')

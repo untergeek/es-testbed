@@ -7,7 +7,7 @@ from . import Alias
 
 # pylint: disable=missing-docstring,too-many-arguments
 
-class Datastream(Alias):
+class DataStream(Alias):
     def __init__(
             self,
             client: Elasticsearch = None,
@@ -15,7 +15,7 @@ class Datastream(Alias):
             autobuild: t.Optional[bool] = True,
         ):
         super().__init__(client=client, name=name, autobuild=autobuild)
-        self.logger = getlogger('es_testbed.Datastream')
+        self.logger = getlogger('es_testbed.Data_Stream')
         self.index_tracker = []
         self.alias = None
 
@@ -26,6 +26,6 @@ class Datastream(Alias):
     def verify(self, index_list: t.Sequence[str]) -> bool:
         retval = False
         if self.backing_indices == index_list:
-            self.logger.debug('Confirm match of datastream "%s" backing indices', self.name)
+            self.logger.debug('Confirm match of data_stream "%s" backing indices', self.name)
             retval = True
         return retval

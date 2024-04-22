@@ -30,6 +30,10 @@ class ComponentMgr(EntityMgr):
         if self.autobuild:
             self.setup()
 
+    @property
+    def logdisplay(self) -> str:
+        return 'component template'
+
     def setup(self):
         for component in self.components:
             es_api.put_comp_tmpl(self.client, self.name, component)
@@ -40,8 +44,3 @@ class ComponentMgr(EntityMgr):
             self.logger.info('Created component template: "%s"', self.last)
         self.logger.info('Successfully created all component templates.')
         self.success = True
-
-    def teardown(self):
-        self.logger.info('Cleaning up all component templates...')
-        components = ','.join(self.entity_list)
-        es_api.delete(self.client, 'component', components)
