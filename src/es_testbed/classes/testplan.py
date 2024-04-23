@@ -8,10 +8,12 @@ from .ilm import IlmBuilder
 # pylint: disable=missing-docstring
 
 class TestPlan(Args):
+    __test__ = False
     def __init__(
             self,
             settings: t.Dict[str, t.Any] = None,
             defaults: t.Dict[str, t.Any] = None,
+            default_entities: bool = True,
         ):
         if defaults is None:
             defaults = TESTPLAN
@@ -25,7 +27,8 @@ class TestPlan(Args):
         self.logger.debug('settings = %s', self.asdict)
         self.update_ilm()
         if not self.entities:
-            self.make_default_entities()
+            if default_entities:
+                self.make_default_entities()
 
         ### Example settings
         # settings={
@@ -90,8 +93,6 @@ class TestPlan(Args):
         for _ in range(0, defs['entity_count']):
             self.add_entity(**kwargs)
         self.logger.debug('Created %s entities', len(self.entities))
-        # if 'defaults' in self.settings:
-        #     defs = self.settings['defaults']
 
     def update_ilm(self) -> None:
         if self.use_ilm():

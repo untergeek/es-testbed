@@ -57,9 +57,10 @@ class IndexMgr(EntityMgr):
                 self.track_alias()
             else:
                 self.alias.rollover()
-                self.logger.debug('Going to wait now...')
-                self.last.ilm_tracker.wait4complete()
-                self.logger.debug('The wait is over!')
+                if self.policy_name:
+                    self.logger.debug('Going to wait now...')
+                    self.last.ilm_tracker.wait4complete()
+                    self.logger.debug('The wait is over!')
             self.filler(scheme)
             self.track_index(self.name)
         created = [x.name for x in self.entity_list]

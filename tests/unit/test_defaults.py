@@ -19,10 +19,10 @@ class TestDefaultFunctions(TestCase):
     def test_ilm_phase_warm(self):
         """Ensure matching output"""
         tier = 'warm'
-        expected = {tier: {'min_age': '30m', 'actions': {}}}
+        expected = {tier: {'min_age': '2d', 'actions': {}}}
         self.assertEqual(ilm_phase(tier), expected)
     def test_ilm_phase_cold(self):
         """Ensure matching output"""
         tier = 'cold'
-        expected = {tier: {'min_age': '1h', 'actions': {}}}
+        expected = {tier: {'min_age': '3d', 'actions': {}}}
         self.assertEqual(ilm_phase(tier), expected)

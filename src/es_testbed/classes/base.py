@@ -2,13 +2,13 @@
 import typing as t
 from datetime import datetime, timezone
 from elasticsearch8 import Elasticsearch
-from es_testbed.defaults import TESTPLAN
 from es_testbed.helpers.utils import getlogger
 from .testplan import TestPlan
 from .tracker import Tracker
 
 class TestBed:
     """Base TestBed Class"""
+    __test__ = False
     def __init__(
             self,
             client: Elasticsearch = None,
@@ -19,7 +19,7 @@ class TestBed:
         self.logger = getlogger('es_testbed.TestBed')
         self.client = client
         if plan is None:
-            plan = TESTPLAN
+            plan = TestPlan() # Use defaults
         self.tracker = Tracker(client=client, plan=plan, autobuild=autobuild)
 
     def ilm_polling(self, interval: t.Union[str, None] = None):

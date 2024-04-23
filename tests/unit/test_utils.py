@@ -9,30 +9,28 @@ class TestUtils(TestCase):
     def test_build_ilm_phase_warm(self):
         """Ensure matching output"""
         tier = 'warm'
-        expected = {tier: {'min_age': '30m', 'actions': {}}}
+        expected = {tier: {'min_age': '2d', 'actions': {}}}
         self.assertEqual(utils.build_ilm_phase(tier), expected)
     def test_build_ilm_phase_cold(self):
         """Ensure matching output"""
         tier = 'cold'
         repo = 'repo'
-        expected = {tier: {'min_age': '1h', 'actions': 
+        expected = {tier: {'min_age': '3d', 'actions': 
                            {'searchable_snapshot': {'snapshot_repository': 'repo'}}}}
         self.assertEqual(utils.build_ilm_phase(tier, repository=repo), expected)
     def test_build_ilm_phase_delete(self):
         """Ensure matching output"""
         tier = 'delete'
-        expected = {tier: {'min_age': '3h', 'actions': {'delete':{}}}}
+        expected = {tier: {'min_age': '5d', 'actions': {'delete':{}}}}
         self.assertEqual(utils.build_ilm_phase(tier), expected)
     def test_build_ilm_policy_hot_delete(self):
         """Ensure matching output"""
         tiers = ['hot', 'delete']
         expected = {
-            'policy': {
-                'phases': {
-                    'hot': {'actions': {'rollover': {
-                        'max_age': '10m', 'max_primary_shard_size': '1gb'}}},
-                    'delete': {'actions': {'delete': {}}, 'min_age': '3h'}
-                }
+            'phases': {
+                'hot': {'actions': {'rollover': {
+                    'max_age': '1d', 'max_primary_shard_size': '1gb'}}},
+                'delete': {'actions': {'delete': {}}, 'min_age': '5d'}
             }
         }
         self.assertEqual(utils.build_ilm_policy(tiers), expected)
@@ -41,16 +39,14 @@ class TestUtils(TestCase):
         tiers = ['hot', 'frozen', 'delete']
         repo = 'repo'
         expected = {
-            'policy': {
-                'phases': {
-                    'hot': {
-                        'actions': {'rollover': {'max_age': '10m', 'max_primary_shard_size': '1gb'}}
-                    },
-                    'frozen': {
-                        'actions': {'searchable_snapshot': {'snapshot_repository': repo}},
-                        'min_age': '2h'},
-                    'delete': {'actions': {'delete': {}}, 'min_age': '3h'}
-                }
+            'phases': {
+                'hot': {
+                    'actions': {'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'}}
+                },
+                'frozen': {
+                    'actions': {'searchable_snapshot': {'snapshot_repository': repo}},
+                    'min_age': '4d'},
+                'delete': {'actions': {'delete': {}}, 'min_age': '5d'}
             }
         }
         self.assertEqual(utils.build_ilm_policy(tiers, repository=repo), expected)
@@ -60,19 +56,17 @@ class TestUtils(TestCase):
         repo = 'repo'
         mns = 3
         expected = {
-            'policy': {
-                'phases': {
-                    'hot': {
-                        'actions': {
-                            'rollover': {'max_age': '10m', 'max_primary_shard_size': '1gb'},
-                            'forcemerge': {'max_num_segments': mns},
-                        }
-                    },
-                    'cold': {
-                        'actions': {'searchable_snapshot': {'snapshot_repository': repo}},
-                        'min_age': '1h'},
-                    'delete': {'actions': {'delete': {}}, 'min_age': '3h'}
-                }
+            'phases': {
+                'hot': {
+                    'actions': {
+                        'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'},
+                        'forcemerge': {'max_num_segments': mns},
+                    }
+                },
+                'cold': {
+                    'actions': {'searchable_snapshot': {'snapshot_repository': repo}},
+                    'min_age': '3d'},
+                'delete': {'actions': {'delete': {}}, 'min_age': '5d'}
             }
         }
         self.assertEqual(

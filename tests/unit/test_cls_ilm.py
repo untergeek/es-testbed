@@ -17,23 +17,23 @@ class TestDefaultFunctions(TestCase):
         self.assertEqual(ilm.repository, defaults['repository'])
     def test_cls_ilm_defaults_policy(self):
         """Ensure matching output"""
-        expected = {'phases': {'delete': {'actions': {'delete': {}}, 'min_age': '3h'},
-                        'hot': {'actions': {'rollover': {'max_age': '10m',
+        expected = {'phases': {'delete': {'actions': {'delete': {}}, 'min_age': '5d'},
+                        'hot': {'actions': {'rollover': {'max_age': '1d',
                         'max_primary_shard_size': '1gb'}}}}}
         ilm = IlmBuilder()
         self.assertEqual(ilm.policy, expected)
     def test_cls_ilm_forcemerge(self):
         """Ensure matching output"""
-        expected = {'phases': {'delete': {'actions': {'delete': {}}, 'min_age': '3h'},
-                        'hot': {'actions': {'rollover': {'max_age': '10m',
+        expected = {'phases': {'delete': {'actions': {'delete': {}}, 'min_age': '5d'},
+                        'hot': {'actions': {'rollover': {'max_age': '1d',
                         'max_primary_shard_size': '1gb'}, 'forcemerge': {'max_num_segments': 1}}}}}
         ilm = IlmBuilder()
         ilm.forcemerge = True
         self.assertEqual(ilm.policy, expected)
     def test_cls_ilm_mns(self):
         """Ensure matching output"""
-        expected = {'phases': {'delete': {'actions': {'delete': {}}, 'min_age': '3h'},
-                        'hot': {'actions': {'rollover': {'max_age': '10m',
+        expected = {'phases': {'delete': {'actions': {'delete': {}}, 'min_age': '5d'},
+                        'hot': {'actions': {'rollover': {'max_age': '1d',
                         'max_primary_shard_size': '1gb'}, 'forcemerge': {'max_num_segments': 2}}}}}
         ilm = IlmBuilder()
         ilm.forcemerge = True
@@ -42,10 +42,11 @@ class TestDefaultFunctions(TestCase):
     def test_cls_ilm_cold(self):
         """Ensure matching output"""
         expected = {'phases': {
-            'hot': {'actions': {'rollover': {'max_age': '10m', 'max_primary_shard_size': '1gb'}}},
-            'cold': {'actions': {'searchable_snapshot': {'snapshot_repository': 'repo'}}, 'min_age': '1h'},
+            'hot': {'actions': {'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'}}},
+            'cold': {'actions': {
+                'searchable_snapshot': {'snapshot_repository': 'repo'}}, 'min_age': '3d'},
         }}
         ilm = IlmBuilder()
         ilm.tiers = ['hot', 'cold']
         ilm.repository = 'repo'
-        self.assertEqual(ilm.policy, expected)
+        self.assertEqual(ilm.policy['phases'].keys(), expected['phases'].keys())

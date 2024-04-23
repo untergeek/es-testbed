@@ -78,7 +78,6 @@ class Index(Entity):
             self.snapmgr.add(self.name, scheme['searchable'])
             # Replace self.name with the renamed name
             self.name = mounted_name(self.name, scheme['searchable'])
-            self.track_ilm(self.name) # Refresh the ilm_tracker with the new index name
 
     def mount_ss(self, scheme: dict) -> None:
         """If the index is planned to become a searchable snapshot, we do that now"""

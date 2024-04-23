@@ -33,8 +33,6 @@ def build_ilm_policy(
     """
     if not tiers:
         tiers = ['hot', 'delete']
-    if 'delete' not in tiers:
-        tiers.append('delete')
     phases = {}
     if ('cold' in tiers or 'frozen' in tiers) and not repository:
         raise TestbedMisconfig('Cannot build cold or frozen phase without repository')
