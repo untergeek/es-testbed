@@ -281,7 +281,7 @@ def get_ilm_phases(client: Elasticsearch, name: str) -> dict:
         msg = f'Unable to get ILM lifecycle named {name}. Error: {err}'
         LOGGER.critical(msg)
         raise exc.ResultNotExpected(msg) from err
-
+    
 def get_write_index(client: Elasticsearch, name: str) -> str:
     """
     Calls :py:meth:`~.elasticsearch.client.IndicesClient.get_alias`
@@ -298,9 +298,12 @@ def get_write_index(client: Elasticsearch, name: str) -> str:
     response = client.indices.get_alias(index=name)
     retval = None
     for index in list(response.keys()):
-        if response[index]['aliases'][name]['is_write_index']:
-            retval = index
-            break
+        try:
+            if response[index]['aliases'][name]['is_write_index']:
+                retval = index
+                break
+        except KeyError:
+            continue
     return retval
 
 def snapshot_name(client: Elasticsearch, name: str) -> t.Union[t.AnyStr, None]:

@@ -1,75 +1,98 @@
 """Test functions in es_testbed.helpers.utils"""
-# pylint: disable=protected-access, import-error
-# add import-error here ^^^ to avoid false-positives for the local import
-from unittest import TestCase
-from es_testbed.helpers import utils
+# pylint: disable=missing-function-docstring,redefined-outer-name
+import typing as t
+import pytest
+from es_testbed import defaults as dft
+from es_testbed import exceptions as ex
+from es_testbed.helpers import utils as u
 
-class TestUtils(TestCase):
-    """Ensure test coverage of simple functions that might be deprecated in the future"""
-    def test_build_ilm_phase_warm(self):
-        """Ensure matching output"""
-        tier = 'warm'
-        expected = {tier: {'min_age': '2d', 'actions': {}}}
-        self.assertEqual(utils.build_ilm_phase(tier), expected)
-    def test_build_ilm_phase_cold(self):
-        """Ensure matching output"""
-        tier = 'cold'
-        repo = 'repo'
-        expected = {tier: {'min_age': '3d', 'actions': 
-                           {'searchable_snapshot': {'snapshot_repository': 'repo'}}}}
-        self.assertEqual(utils.build_ilm_phase(tier, repository=repo), expected)
-    def test_build_ilm_phase_delete(self):
-        """Ensure matching output"""
-        tier = 'delete'
-        expected = {tier: {'min_age': '5d', 'actions': {'delete':{}}}}
-        self.assertEqual(utils.build_ilm_phase(tier), expected)
-    def test_build_ilm_policy_hot_delete(self):
-        """Ensure matching output"""
-        tiers = ['hot', 'delete']
-        expected = {
-            'phases': {
-                'hot': {'actions': {'rollover': {
-                    'max_age': '1d', 'max_primary_shard_size': '1gb'}}},
-                'delete': {'actions': {'delete': {}}, 'min_age': '5d'}
-            }
-        }
-        self.assertEqual(utils.build_ilm_policy(tiers), expected)
-    def test_build_ilm_policy_hot_frozen_delete(self):
-        """Ensure matching output"""
-        tiers = ['hot', 'frozen', 'delete']
-        repo = 'repo'
-        expected = {
-            'phases': {
-                'hot': {
-                    'actions': {'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'}}
-                },
-                'frozen': {
-                    'actions': {'searchable_snapshot': {'snapshot_repository': repo}},
-                    'min_age': '4d'},
-                'delete': {'actions': {'delete': {}}, 'min_age': '5d'}
-            }
-        }
-        self.assertEqual(utils.build_ilm_policy(tiers, repository=repo), expected)
-    def test_build_ilm_policy_hot_forcemerge_cold_delete(self):
-        """Ensure matching output"""
-        tiers = ['hot', 'cold', 'delete']
-        repo = 'repo'
-        mns = 3
-        expected = {
-            'phases': {
-                'hot': {
-                    'actions': {
-                        'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'},
-                        'forcemerge': {'max_num_segments': mns},
-                    }
-                },
-                'cold': {
-                    'actions': {'searchable_snapshot': {'snapshot_repository': repo}},
-                    'min_age': '3d'},
-                'delete': {'actions': {'delete': {}}, 'min_age': '5d'}
-            }
-        }
-        self.assertEqual(
-            utils.build_ilm_policy(tiers, repository=repo, forcemerge=True, max_num_segments=mns),
-            expected
-        )
+FMAP: t.Dict[str, t.Dict] = {
+    'hot': dft.ilmhot(),
+    'warm': dft.ilmwarm(),
+    'cold': dft.ilmcold(),
+    'frozen': dft.ilmfrozen(),
+    'delete': dft.ilmdelete(),
+}
+REPO: str = 'repo'
+TIERS: t.Sequence[str] = ['hot', 'warm', 'cold', 'frozen', 'delete']
+TREPO: t.Dict[str, t.Union[str, None]] = {
+    'hot': None,
+    'warm': None,
+    'cold': REPO,
+    'frozen': REPO,
+    'delete': None,
+}
+
+def searchable(repo: str=None) -> t.Union[t.Dict[str, t.Dict[str, str]], None]:
+    if repo:
+        return {'searchable_snapshot': {'snapshot_repository': repo}}
+    return {}
+
+def forcemerge(fm: bool=False, mns: int=1) -> t.Union[t.Dict[str, t.Dict[str, str]], None]:
+    if fm:
+        return {'forcemerge': {'max_num_segments': mns}}
+    return {}
+
+@pytest.fixture
+def tiertestval():
+    def _tiertestval(tier: str, repo: str=None, fm: bool=False, mns: int=1):
+        retval = {tier: FMAP[tier]}
+        retval[tier]['actions'].update(searchable(repo))
+        retval[tier]['actions'].update(forcemerge(fm=fm, mns=mns))
+        return retval
+    return _tiertestval
+
+@pytest.fixture
+def builtphase():
+    def _builtphase(tier: str, repo: str=None, fm: bool=False, mns: int=1):
+        return u.build_ilm_phase(tier, actions=forcemerge(fm=fm, mns=mns), repository=repo)
+    return _builtphase
+
+def test_build_ilm_phase_defaults(builtphase, tiertestval):
+    for tier in TIERS:
+        assert builtphase(tier, repo=TREPO[tier]) == tiertestval(tier, repo=TREPO[tier])
+
+def test_build_ilm_phase_add_action():
+    expected = {'foo': 'bar'}
+    tier = 'warm'
+    assert u.build_ilm_phase(tier, actions=expected)[tier]['actions'] == expected
+
+def test_build_ilm_phase_fail_repo(builtphase):
+    with pytest.raises(ex.TestbedMisconfig):
+        builtphase('cold', repo=None)
+
+# This allows me to run multiple testing scenarios in the same test space
+def test_build_ilm_policy(tiertestval):
+    # 3 tests building different ILM policies with different tiers
+    tgroups = [['hot', 'delete'], ['hot', 'frozen', 'delete'], ['hot', 'cold', 'delete']]
+    # Each tier group corresponds to a forcemerge plan by list index, with each index a tuple for
+    # forcemerge True/False and max_num_segment count
+    fmerge = [(False, 0), (False, 0), (True, 3)]
+    for idx, tgrp in enumerate(tgroups): # Iterate over testing scenarios
+        phases = {} # Build out the phase dict for each scenario
+        fm, mns = fmerge[idx] # Extract whether to use forcemerge by index/tuple
+        for tier in tgrp: # Iterate over each tier in the testing scenario
+            phases.update(tiertestval(tier, repo=TREPO[tier])) # Update with values per tier
+        if fm: # If we're doing forcemerge
+            phases['hot']['actions'].update(forcemerge(fm=fm, mns=mns)) # Update the hot tier
+        # To keep the line more readable, build the kwargs as a dict first
+        kwargs = {'repository': REPO, 'forcemerge': fm, 'max_num_segments': mns}
+        # Then pass it as **kwargs
+        assert u.build_ilm_policy(tgrp, **kwargs) == {'phases': phases}
+        # Our policy is easier to build at the last minute rather than constantly passing
+        # dict['phases']['tier']
+
+def test_build_ilm_policy_fail_repo():
+    with pytest.raises(ex.TestbedMisconfig):
+        u.build_ilm_policy(['hot', 'frozen'], repository=None)
+
+@pytest.fixture
+def fieldmatch():
+    def _fieldmatch(name: str, num: int):
+        return f'{name}{num}'
+    return _fieldmatch    
+
+# def test_doc_gen_matching(fieldmatch):
+#     fields = ['message', 'key', 'l3']
+#     for doc in u.doc_gen(count=2, start_at=0, match=True):
+#         assert doc[]

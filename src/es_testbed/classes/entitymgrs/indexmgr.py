@@ -5,10 +5,10 @@ from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import getlogger, setting_component
 from .entitymgr import EntityMgr
 from .snapshotmgr import SnapshotMgr
-from ..entities import Alias, Index
+from ..entities import Alias, DataStream, Index
 from ..testplan import TestPlan
 
-# pylint: disable=missing-docstring,too-many-arguments,broad-exception-caught
+# pylint: disable=missing-docstring,too-many-arguments,broad-exception-caught,too-many-instance-attributes
 
 class IndexMgr(EntityMgr):
     def __init__(
@@ -24,7 +24,9 @@ class IndexMgr(EntityMgr):
         self.logger = getlogger('es_testbed.IndexMgr')
         self.snapmgr = snapmgr
         self.policy_name = policy_name
-        self.alias = None # Only used for tracking the rollover alias
+        self.alias: Alias = None # Only used for tracking the rollover alias
+        self.ds: DataStream = None # Only used for child class DataStreamMgr
+        self.index_trackers: t.Sequence[Index] = [] # Only used for child class DataStreamMgr
         self.doc_incr = 0
         if self.autobuild:
             self.setup()
@@ -41,32 +43,38 @@ class IndexMgr(EntityMgr):
         # In this case, value is a single array element from plan.entities
         self.logger.debug('Creating index: %s', value)
         es_api.create_index(self.client, value)
-        self.filler(value)
-        self.track_index(value)
 
-    def add_rollover(self) -> None:
-        settings = setting_component(
+    def _rollover_path(self) -> None:
+        if not self.entity_list:
+            settings = setting_component(
             ilm_policy=self.policy_name, rollover_alias=self.aliasname)['settings']
-        aliascfg = {self.aliasname: {'is_write_index': True}}
+            aliascfg = {self.aliasname: {'is_write_index': True}}
+            self.logger.debug('No indices created yet. Starting with a rollover alias index...')
+            es_api.create_index(
+                self.client, self.name, aliases=aliascfg, settings=settings)
+            self.logger.debug('Created %s with rollover alias %s', self.name, self.aliasname)
+            self.track_alias()
+        else:
+            self.alias.rollover()
+            if self.policy_name:
+                self.logger.debug('Going to wait now...')
+                self.last.ilm_tracker.wait4complete()
+                self.logger.debug('The wait is over!')
+
+    def add_indices(self) -> None:
         for scheme in self.plan.entities:
-            if not self.entity_list:
-                self.logger.debug('No indices created yet. Starting with a rollover alias index...')
-                es_api.create_index(
-                    self.client, self.name, aliases=aliascfg, settings=settings)
-                self.logger.debug('Created %s with rollover alias %s', self.name, self.aliasname)
-                self.track_alias()
+            if self.plan.rollover_alias:
+                self._rollover_path()
             else:
-                self.alias.rollover()
-                if self.policy_name:
-                    self.logger.debug('Going to wait now...')
-                    self.last.ilm_tracker.wait4complete()
-                    self.logger.debug('The wait is over!')
+                self.add(self.name)
             self.filler(scheme)
             self.track_index(self.name)
         created = [x.name for x in self.entity_list]
         self.logger.debug('Created indices: %s', created)
-        if not self.alias.verify(created):
-            self.logger.error('Unable to confirm rollover of alias "%s" was successfully executed')
+        if self.plan.rollover_alias:
+            if not self.alias.verify(created):
+                self.logger.error(
+                    'Unable to confirm rollover of alias "%s" was successfully executed')
 
     def filler(self, scheme) -> None:
         """If the scheme from the TestPlan says to write docs, do it"""
@@ -91,10 +99,7 @@ class IndexMgr(EntityMgr):
         self.logger.debug('Beginning setup...')
         if self.plan.rollover_alias:
             self.logger.debug('rollover_alias is True...')
-            self.add_rollover()
-        else:
-            for scheme in self.plan.entities:
-                self.add(scheme)
+        self.add_indices()
         self.searchable()
         self.logger.info('Successfully created indices: %s', self.indexlist)
         self.success = True

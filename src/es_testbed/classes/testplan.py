@@ -23,6 +23,7 @@ class TestPlan(Args):
         self.ilm = False
         self.prefix = None
         self.uniq = randomstr(length=8, lowercase=True)
+        self.repository = None
         self.update_settings(settings)
         self.logger.debug('settings = %s', self.asdict)
         self.update_ilm()
@@ -37,6 +38,7 @@ class TestPlan(Args):
         #   'rollover_alias': True, # Only respected if 'type' == 'indices'.
         #                         # Will rollover after creation and filling
         #   'uniq': 'my-unique-str', # If not provided, randomstr(length=8, lowercase=True)
+        #   'repository': Only used for snapshots when ILM is not used.
         #   'ilm': { # All of these ILM values are defaults
         #     'tiers': ['hot', 'delete'],
         #     'forcemerge': False,

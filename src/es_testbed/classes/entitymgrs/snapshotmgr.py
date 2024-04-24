@@ -18,6 +18,11 @@ class SnapshotMgr(EntityMgr):
         super().__init__(client=client, plan=plan, autobuild=autobuild)
         self.kind = 'snapshot'
         self.logger = getlogger('es_testbed.SnapshotMgr')
+        self.repo = self.plan.repository # It will be None, at least
+        try:
+            self.repo = self.plan.ilm.repository
+        except AttributeError:
+            self.logger.debug('Plan has no ilm.repository attribute')
         # We do not autobuild in this class
 
     def add(self, index: str, tier: str) -> None:
@@ -25,7 +30,7 @@ class SnapshotMgr(EntityMgr):
         self.logger.info(msg)
         es_api.do_snap(
             self.client,
-            self.plan.ilm.repository,
+            self.repo,
             self.name,
             index,
             tier=tier
@@ -48,6 +53,6 @@ class SnapshotMgr(EntityMgr):
             self.logger.info('No snapshots to clean up.')
             return
         self.logger.info('Cleaning up any existing snapshots...')
-        for snapshot in self.entity_list:
-            es_api.delete(self.client, 'snapshot', snapshot, repository=self.plan.ilm.repository)
+        es_api.delete(self.client, 'snapshot', ','.join(self.entity_list), repository=self.repo)
         self.logger.info('Cleanup of snapshots completed.')
+        self.entity_list = []

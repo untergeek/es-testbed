@@ -1,22 +1,28 @@
 """Test functions in es_testbed.TestBed"""
-# pylint: disable=redefined-outer-name,missing-function-docstring
+# pylint: disable=redefined-outer-name,missing-function-docstring,missing-class-docstring
 import pytest
 from es_testbed import TestPlan, TestBed
 from es_testbed.defaults import NAMEMAPPER
 from es_testbed.helpers.es_api import get_write_index
 
 @pytest.fixture(scope='module')
-def settings(prefix, uniq):
+def settings(prefix, uniq, repo):
+    if not repo:
+        pytest.skip('No snapshot repository', allow_module_level=True)
     return {
         'type': 'indices',
         'prefix': prefix,
         'rollover_alias': True,
         'uniq': uniq,
-        'ilm': False
+        'ilm': {
+            'tiers': ['hot', 'frozen', 'delete'],
+            'forcemerge': False,
+            'max_num_segments': 1,
+            'repository': repo,
+        }
     }
 
-class TestTestBedBasicIndices:
-    """Test basic TestBed class functionality"""
+class TestFrozenIndices:
     @pytest.fixture(scope="class")
     def tb(self, client, settings):
         teebee = TestBed(client, plan=TestPlan(settings=settings))
@@ -27,8 +33,8 @@ class TestTestBedBasicIndices:
     def test_entity_count(self, tb):
         assert len(tb.tracker.entities.entity_list) == 3
 
-    def test_first_index(self, tb, prefix, uniq):
-        value = f'{prefix}-{NAMEMAPPER['index']}-{uniq}-000001'
+    def test_first_index(self, tb, frozen, prefix, uniq):
+        value = f'{frozen}{prefix}-{NAMEMAPPER['index']}-{uniq}-000001'
         assert tb.tracker.entities.entity_list[0].name == value
 
     def test_last_index(self, tb, prefix, uniq):

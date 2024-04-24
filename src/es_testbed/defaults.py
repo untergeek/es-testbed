@@ -1,6 +1,6 @@
 """Default values and constants"""
 import typing as t
-# pylint: disable=E1120
+# pylint: disable=missing-function-docstring
 
 EPILOG: str = 'Learn more at https://github.com/untergeek/es-testbed'
 
@@ -45,6 +45,7 @@ PLURALMAP: t.Dict[str, str] = {
 TESTPLAN: dict = {
     'type': 'indices',
     'prefix': 'es-testbed',
+    'repository': None,
     'rollover_alias': False,
     'ilm': {
         'tiers': ['hot', 'delete'],
@@ -79,21 +80,39 @@ TIER: dict = {
     }
 }
 
+TIMEOUT_DEFAULT: str = '30'
+TIMEOUT_ENVVAR: str = 'ES_TESTBED_TIMEOUT'
+
+IlmPhase: t.TypeAlias = (
+    t.Dict[str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]]
+)
+
+def ilmhot() -> IlmPhase:
+    return {
+        'actions': {
+            'rollover': {
+                'max_primary_shard_size': '1gb',
+                'max_age': '1d'
+            }
+        }
+    }
+def ilmwarm() -> IlmPhase:
+    return {'min_age': '2d', 'actions': {}}
+def ilmcold() -> IlmPhase:
+    return  {'min_age': '3d', 'actions': {}}
+def ilmfrozen() -> IlmPhase:
+    return {'min_age': '4d', 'actions': {}}
+def ilmdelete() -> IlmPhase:
+    return {'min_age': '5d', 'actions': {'delete': {}}}
+
 def ilm_phase(tier):
     """Return the default phase step based on 'tier'"""
     phase_map = {
-        'hot': {
-            'actions': {
-                'rollover': {
-                    'max_primary_shard_size': '1gb',
-                    'max_age': '1d'
-                }
-            }
-        },
-        'warm': {'min_age': '2d', 'actions': {}},
-        'cold': {"min_age": "3d", "actions": {}},
-        'frozen': {"min_age": "4d", "actions": {}},
-        'delete': {"min_age": "5d", "actions": {"delete": {}}}   
+        'hot': ilmhot(),
+        'warm': ilmwarm(),
+        'cold': ilmcold(),
+        'frozen': ilmfrozen(),
+        'delete': ilmdelete(),
     }
     return {tier: phase_map[tier]}
 

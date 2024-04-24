@@ -24,15 +24,13 @@ class DataStreamMgr(IndexMgr):
             client=client, plan=plan, autobuild=autobuild, snapmgr=snapmgr, policy_name=policy_name)
         self.kind = 'data_stream'
         self.logger = getlogger('es_testbed.DataStreamMgr')
-        self.ds = None
-        self.index_trackers = []
 
     @property
     def suffix(self): # Remapping this to send no suffix for data_streams
         return ''
 
     @property
-    def tracked_index_list(self) -> t.Sequence[str]:
+    def indexlist(self) -> t.Sequence[str]:
         return [x.name for x in self.index_trackers]
 
     def add(self, value):
@@ -62,18 +60,19 @@ class DataStreamMgr(IndexMgr):
         self.logger.debug('Created data_stream backing indices: %s', self.ds.backing_indices)
         for index in self.ds.backing_indices:
             self.track_index(index)
-        self.ds.verify(self.tracked_index_list)
+        self.ds.verify(self.indexlist)
         self.searchable()
-        self.ds.verify(self.tracked_index_list)
+        self.ds.verify(self.indexlist)
         self.logger.info('Successfully completed data_stream buildout.')
         self.success = True
 
     def track_data_stream(self) -> None:
-        entity = DataStream(client=self.client, name=self.name)
-        self.ds = entity
+        self.logger.debug('Tracking data_stream: %s', self.name)
+        self.ds = DataStream(client=self.client, name=self.name)
         self.entity_list.append(self.name)
 
     def track_index(self, name: str) -> None:
+        self.logger.debug('Tracking index: %s', name)
         entity = Index(
             client=self.client,
             name=name,

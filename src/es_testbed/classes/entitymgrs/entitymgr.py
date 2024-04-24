@@ -92,7 +92,7 @@ class EntityMgr:
                 msg = f'Unable to delete {self.logdisplay}: {value}. Error: {err}'
                 self.logger.error(msg)
                 continue
-            self.logger.info('Deleted %s %s', self.logdisplay, value)
+            self.logger.debug('Deleted %s %s', self.logdisplay, value)
             positions.append(idx)
         positions.sort() # Sort first to ensure lowest to highest order
         for idx in reversed(positions): # Reverse the list and iterate

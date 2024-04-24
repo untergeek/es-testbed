@@ -65,6 +65,7 @@ class Tracker:
         )
 
     def teardown(self):
+        # These are ordered this way on purpose
         self.entities.teardown()
         self.snapshots.teardown()
         self.ilm_policies.teardown()
