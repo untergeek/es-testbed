@@ -46,19 +46,20 @@ TESTPLAN: dict = {
     'type': 'indices',
     'prefix': 'es-testbed',
     'repository': None,
-    'rollover_alias': False,
+    'rollover_alias': None,
     'ilm': {
+        'enabled': False,
         'tiers': ['hot', 'delete'],
         'forcemerge': False,
-        'max_num_segments': 1,
-        'repository': None,
+        'max_num_segments': 1
     },
     'defaults': {
         'entity_count': 3,
         'docs': 10,
         'match': True,
         'searchable': None,
-    }
+    },
+    'entities': [],
 }
 
 TIER: dict = {

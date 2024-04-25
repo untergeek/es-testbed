@@ -1,7 +1,7 @@
 """Test functions in es_testbed.TestBed"""
 # pylint: disable=redefined-outer-name,missing-function-docstring,missing-class-docstring
 import pytest
-from es_testbed import TestPlan, TestBed
+from es_testbed import PlanBuilder, TestBed
 
 @pytest.fixture(scope='module')
 def settings(prefix, uniq, repo):
@@ -13,7 +13,6 @@ def settings(prefix, uniq, repo):
         'rollover_alias': False,
         'repository': repo,
         'uniq': uniq,
-        'ilm': False,
         'defaults': {
             'entity_count': 3,
             'docs': 10,
@@ -25,7 +24,8 @@ def settings(prefix, uniq, repo):
 class TestManualFrozenIndices:
     @pytest.fixture(scope="class")
     def tb(self, client, settings):
-        teebee = TestBed(client, plan=TestPlan(settings=settings))
+        theplan = PlanBuilder(settings=settings).plan
+        teebee = TestBed(client, plan=theplan)
         teebee.setup()
         yield teebee
         teebee.teardown()

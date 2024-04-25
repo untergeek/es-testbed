@@ -2,119 +2,56 @@
 import typing as t
 from os import getenv
 from time import sleep
+from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
-from es_testbed.defaults import TESTPLAN, PAUSE_ENVVAR, PAUSE_DEFAULT
+from es_testbed.defaults import PAUSE_ENVVAR, PAUSE_DEFAULT
 from es_testbed.exceptions import NameChanged, ResultNotExpected, TestbedMisconfig
 from es_testbed.helpers import es_api
-from es_testbed.helpers.utils import build_ilm_policy, getlogger
-from .args import Args
+from es_testbed.helpers.utils import getlogger
 PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 
 # pylint: disable=missing-docstring
-class IlmBuilder(Args):
-    """Define elements of an ILM policy"""
-    def __init__(
-            self,
-            settings: t.Dict[str, t.Any] = None,
-            defaults: t.Dict[str, t.Any] = None,
-            enabled: t.Optional[bool] = True,
-        ):
-        super().__init__(settings=settings, defaults=defaults)
-        self.logger = getlogger('es_testbed.IlmBuilder')
-        self.enabled = enabled
-        self.tiers = []
-        if enabled:
-            self.logger.debug('ILM Enabled? %s', enabled)
-            self.logger.debug('Apply defaults: %s', TESTPLAN['ilm'])
-            self.set_defaults(TESTPLAN['ilm']) # Set defaults
-            self.logger.debug('Defaults set: %s', self.asdict)
-            if settings:
-                self.update_settings(settings) # Update beyond defaults
-                self.logger.debug('Settings passed: %s', self.asdict)
 
-    @property
-    def enabled(self) -> bool:
-        return self._enabled
-    @enabled.setter
-    def enabled(self, value: bool):
-        self._enabled = value
-
-    @property
-    def policy(self) -> dict:
-        if self.enabled:
-            return build_ilm_policy(**self.asdict)
-        return None
-    @policy.setter
-    def policy(self, value: dict):
-        self._policy = value
-
-class IlmExplain(Args):
-    """Track Index ilm.explain_lifecycle API results"""
-    def __init__(
-            self,
-            settings: t.Dict[str, t.Any] = None,
-            defaults: t.Dict[str, t.Any] = None,
-        ):
-        self.action = None
-        self.phase = None
-        self.policy = None
-        self.step = None
-        super().__init__(settings=settings, defaults=defaults)
-        self.logger = getlogger('es_testbed.IlmExplain')
-        ### The important keys are:
-        ### [action, index, managed, phase, policy, step]
-        #
-        # kwarg settings should be passed the output of 
-        # client.ilm.explain_lifecycle(index=name)['indices'][name]
-        # {
-        #     'action': 'complete',
-        #     'action_time_millis': 0,
-        #     'age': '5.65m',
-        #     'index': 'INDEX_NAME',
-        #     'index_creation_date_millis': 0,
-        #     'lifecycle_date_millis': 0,
-        #     'managed': True,
-        #     'phase': 'hot',
-        #     'phase_execution': {
-        #         'modified_date_in_millis': 0,
-        #         'phase_definition': {
-        #             'actions': {
-        #                 'rollover': {
-        #                     'max_age': 'MAX_AGE',
-        #                     'max_primary_shard_docs': 1000,
-        #                     'max_primary_shard_size': 'MAX_SIZE',
-        #                     'min_docs': 1
-        #                 }
-        #             },
-        #             'min_age': '0ms'
-        #         },
-        #         'policy': 'POLICY_NAME',
-        #         'version': 1
-        #     },
-        #     'phase_time_millis': 0,
-        #     'policy': 'POLICY_NAME',
-        #     'step': 'complete',
-        #     'step_time_millis': 0,
-        #     'time_since_index_creation': '5.65m'
-        # }
+### Example ILM explain output
+# {
+#     'action': 'complete',
+#     'action_time_millis': 0,
+#     'age': '5.65m',
+#     'index': 'INDEX_NAME',
+#     'index_creation_date_millis': 0,
+#     'lifecycle_date_millis': 0,
+#     'managed': True,
+#     'phase': 'hot',
+#     'phase_execution': {
+#         'modified_date_in_millis': 0,
+#         'phase_definition': {
+#             'actions': {
+#                 'rollover': {
+#                     'max_age': 'MAX_AGE',
+#                     'max_primary_shard_docs': 1000,
+#                     'max_primary_shard_size': 'MAX_SIZE',
+#                     'min_docs': 1
+#                 }
+#             },
+#             'min_age': '0ms'
+#         },
+#         'policy': 'POLICY_NAME',
+#         'version': 1
+#     },
+#     'phase_time_millis': 0,
+#     'policy': 'POLICY_NAME',
+#     'step': 'complete',
+#     'step_time_millis': 0,
+#     'time_since_index_creation': '5.65m'
+# }
 
 class IlmTracker:
     def __init__(self, client: Elasticsearch, name: str):
         self.logger = getlogger('es_testbed.IlmTracker')
         self.client = client
         self.name = self.resolve(name) # A single index name
-        self._explain = IlmExplain(settings=self.get_explain_data())
+        self._explain = DotMap(self.get_explain_data())
         self._phases = es_api.get_ilm_phases(self.client, self._explain.policy)
-        # IlmExplain is a subclass of Args, which allows us to treat each dictionary key
-        # as an attribute. This means we can access as attributes:
-        # self._explain.
-        #     'action': 'complete',
-        #     'index': 'INDEX_NAME',
-        #     'managed': True,
-        #     'phase': 'hot',
-        #     'policy': 'POLICY_NAME',
-        #     'step': 'complete',
-        # (among others, as needed)
 
     @property
     def current_step(self) -> dict:
@@ -125,11 +62,11 @@ class IlmTracker:
         }
 
     @property
-    def explain(self):
+    def explain(self) -> DotMap:
         return self._explain
 
     @property
-    def next_phase(self):
+    def next_phase(self) -> str:
         retval = None
         if self._explain.phase == 'delete':
             self.logger.warning('Already on "delete" phase. No more phases to advance')
@@ -143,14 +80,15 @@ class IlmTracker:
         return retval
 
     @property
-    def policy_phases(self):
+    def policy_phases(self) -> t.Sequence[str]:
         return list(self._phases.keys())
 
     def advance(self, phase: str=None, action: str=None, name: str=None) -> None:
         def wait(phase: str) -> None:
             counter = 0
+            sleep(1.5) # Initial wait since we set ILM to poll every second
             while self._explain.phase != phase:
-                sleep(1.5)
+                sleep(PAUSE_VALUE)
                 self.update()
                 counter += 1
                 self.count_logging(counter)
@@ -162,12 +100,7 @@ class IlmTracker:
             next_step = self.next_step(phase, action=action, name=name)
             self.logger.debug('next_step: %s', next_step)
             if next_step:
-                es_api.ilm_move(
-                    self.client,
-                    self.name,
-                    self.current_step,
-                    next_step
-                )
+                es_api.ilm_move(self.client, self.name, self.current_step, next_step)
                 wait(phase)
                 self.logger.info('Index %s now on phase %s', self.name, phase)
             else:
@@ -183,7 +116,7 @@ class IlmTracker:
             self.logger.critical(msg)
             raise ResultNotExpected(msg)
 
-    def get_explain_data(self):
+    def get_explain_data(self) -> t.Dict:
         try:
             return es_api.ilm_explain(self.client, self.name)
         except NameChanged as err:
@@ -194,7 +127,7 @@ class IlmTracker:
             self.logger.critical(msg)
             raise ResultNotExpected(msg) from err
 
-    def next_step(self, phase: str=None, action: str=None, name: str=None) -> dict:
+    def next_step(self, phase: str=None, action: str=None, name: str=None) -> t.Dict:
         err1 = bool((action is not None) and (name is None))
         err2 = bool((action is None) and (name is not None))
         if err1 or err2:
@@ -209,11 +142,11 @@ class IlmTracker:
             retval['name'] = name
         return retval
 
-    def pnum(self, phase: str):
+    def pnum(self, phase: str) -> int:
         _ = {'new': 0, 'hot': 1, 'warm': 2, 'cold': 3, 'frozen': 4, 'delete': 5}
         return _[phase]
 
-    def pname(self, num: int):
+    def pname(self, num: int) -> str:
         _ = {0: 'new', 1: 'hot', 2: 'warm', 3: 'cold', 4: 'frozen', 5: 'delete'}
         return _[num]
 
@@ -230,9 +163,9 @@ class IlmTracker:
             raise ResultNotExpected(msg)
         return res['indices'][0]['name']
 
-    def update(self):
+    def update(self) -> None:
         try:
-            self._explain.update_settings(self.get_explain_data())
+            self._explain = DotMap(self.get_explain_data())
         except NameChanged as err:
             self.logger.debug('Passing along upstream exception...')
             raise NameChanged from err
@@ -252,7 +185,7 @@ class IlmTracker:
             try:
                 self.count_logging(counter)
             except ResultNotExpected as err:
-                self.logger.critical('Breaking the loop. Explain: %s', self._explain.asdict)
+                self.logger.critical('Breaking the loop. Explain: %s', self._explain.toDict())
                 raise ResultNotExpected from err
             try:
                 self.update()

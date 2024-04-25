@@ -1,52 +1,52 @@
 """Index Template Entity Manager Class"""
 import typing as t
+from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
 from es_testbed.exceptions import ResultNotExpected
 from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import getlogger
 from .entitymgr import EntityMgr
-from ..testplan import TestPlan
 
 # pylint: disable=missing-docstring,too-many-arguments
 
 class TemplateMgr(EntityMgr):
+    kind = 'template'
+    listname = 'index_templates'
     def __init__(
             self,
             client: Elasticsearch = None,
-            plan: TestPlan = None,
+            plan: DotMap = None,
             autobuild: t.Optional[bool] = True,
-            is_ds: t.Optional[bool] = False,
-            components: t.Sequence[str] = None,
         ):
         super().__init__(client=client, plan=plan, autobuild=autobuild)
-        self.kind = 'template'
         self.logger = getlogger('es_testbed.TemplateMgr')
-        self.components = components
-        self.ds = {} if is_ds else None
-        if self.autobuild:
-            self.setup()
-
-    def get_pattern(self, kind: str) -> str:
-        return f'{self.plan.prefix}-{self.ident(dkey=kind)}-{self.plan.uniq}'
 
     @property
     def logdisplay(self) -> str:
         return 'index template'
 
+    @property
+    def patterns(self) -> t.Sequence[str]:
+        _ = []
+        _.append(f"{self.get_pattern('index')}*")
+        _.append(f"{self.get_pattern('data_stream')}*")
+        return _
+
+    def get_pattern(self, kind: str) -> str:
+        return f'{self.plan.prefix}-{self.ident(dkey=kind)}-{self.plan.uniq}'
+
     def setup(self):
-        patterns = []
-        patterns.append(f"{self.get_pattern('index')}*")
-        patterns.append(f"{self.get_pattern('data_stream')}*")
+        ds = {} if self.plan.type == 'data_stream' else None
         es_api.put_idx_tmpl(
             self.client,
             self.name,
-            patterns,
-            components=self.components,
-            data_stream=self.ds
+            self.patterns,
+            components=self.plan.component_templates,
+            data_stream=ds
         )
-        if not es_api.exists(self.client, 'template', self.name):
+        if not es_api.exists(self.client, self.kind, self.name):
             raise ResultNotExpected(
                 f'Unable to verify creation of index template {self.name}')
-        self.entity_list.append(self.name)
+        self.appender(self.name)
         self.logger.debug('Successfully created index template: %s', self.last)
         self.success = True

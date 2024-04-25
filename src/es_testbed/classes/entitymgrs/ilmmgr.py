@@ -1,53 +1,52 @@
 """ILM Policy Entity Manager Class"""
 import typing as t
+from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
 from es_testbed.exceptions import ResultNotExpected
 from es_testbed.helpers import es_api
-from es_testbed.helpers.utils import getlogger
+from es_testbed.helpers.utils import build_ilm_policy, getlogger
 from .entitymgr import EntityMgr
-from ..ilm import IlmBuilder
-from ..testplan import TestPlan
+
 # pylint: disable=missing-docstring
 
 class IlmMgr(EntityMgr):
+    kind = 'ilm'
+    listname = 'ilm_policies'
     def __init__(
             self,
             client: Elasticsearch = None,
-            plan: TestPlan = None,
+            plan: DotMap = None,
             autobuild: t.Optional[bool] = True,
         ):
         super().__init__(client=client, plan=plan, autobuild=autobuild)
         self.logger = getlogger('es_testbed.IlmMgr')
-        self.kind = 'ilm'
-        self.ilm = False
-        # If ILM was configured in the plan settings, plan.ilm should be an IlmBuilder instance
-        # If not, we won't end up using ILM
-        if isinstance(self.plan, TestPlan):
-            self.logger.debug('We have a plan object')
-            self.logger.debug('Our plan object contains: %s', self.plan.asdict)
-            if isinstance(self.plan.ilm, IlmBuilder):
-                self.logger.debug('Our plan object is an IlmBuilder class instance')
-                self.ilm = self.plan.ilm
-                self.logger.debug('Our plan is: %s', self.ilm.asdict)
-        else:
-            self.logger.debug('We have no plan object')
-        if self.autobuild:
-            self.setup()
 
     @property
     def logdisplay(self) -> str:
         return 'ILM policy'
 
+    def get_policy(self):
+        d = self.plan.ilm
+        kwargs = {
+            'tiers': d.tiers,
+            'forcemerge': d.forcemerge, 
+            'max_num_segments': d.max_num_segments,
+            'repository': self.plan.repository,
+        }
+        return build_ilm_policy(**kwargs)
+
     def setup(self):
-        if isinstance(self.ilm, IlmBuilder):
-            es_api.put_ilm(self.client, self.name, policy=self.ilm.policy)
+        if self.plan.ilm.enabled:
+            self.plan.ilm.policy = self.get_policy()
+            es_api.put_ilm(self.client, self.name, policy=self.plan.ilm.policy)
             # Verify existence
             if not es_api.exists(self.client, 'ilm', self.name):
                 raise ResultNotExpected(
                     f'Unable to verify creation of ilm policy {self.name}')
-            self.entity_list.append(self.name)
+            # This goes first because the length of entity_list determines the suffix
+            self.appender(self.name)
             self.logger.info('Successfully created ILM policy: %s', self.last)
         else:
-            self.entity_list.append(None)
+            self.appender(None) # This covers self.plan.ilm_policies[-1]
             self.logger.info('No ILM policy created.')
         self.success = True
