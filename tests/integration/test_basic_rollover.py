@@ -1,7 +1,7 @@
 """Test functions in es_testbed.TestBed"""
 # pylint: disable=redefined-outer-name,missing-function-docstring,missing-class-docstring
 import pytest
-from es_testbed import TestPlan, TestBed
+from es_testbed import PlanBuilder, TestBed
 from es_testbed.defaults import NAMEMAPPER
 from es_testbed.helpers.es_api import get_write_index
 
@@ -12,13 +12,14 @@ def settings(prefix, uniq):
         'prefix': prefix,
         'rollover_alias': True,
         'uniq': uniq,
-        'ilm': False
+        'ilm': False,
     }
 
 class TestBasicRolloverIndices:
     @pytest.fixture(scope="class")
     def tb(self, client, settings):
-        teebee = TestBed(client, plan=TestPlan(settings=settings))
+        theplan = PlanBuilder(settings=settings).plan
+        teebee = TestBed(client, plan=theplan)
         teebee.setup()
         yield teebee
         teebee.teardown()

@@ -1,7 +1,7 @@
 """Test functions in es_testbed.TestBed"""
 # pylint: disable=redefined-outer-name,missing-function-docstring,missing-class-docstring
 import pytest
-from es_testbed import TestPlan, TestBed
+from es_testbed import PlanBuilder, TestBed
 from es_testbed.helpers.es_api import get_write_index
 
 @pytest.fixture(scope='module')
@@ -14,7 +14,7 @@ def settings(prefix, uniq, repo):
         'rollover_alias': True,
         'repository': repo,
         'uniq': uniq,
-        'ilm': False,
+        'ilm': {},
         'defaults': {
             'entity_count': 3,
             'docs': 10,
@@ -26,7 +26,8 @@ def settings(prefix, uniq, repo):
 class TestRolloverManualFrozenIndices:
     @pytest.fixture(scope="class")
     def tb(self, client, settings):
-        teebee = TestBed(client, plan=TestPlan(settings=settings))
+        theplan = PlanBuilder(settings=settings).plan
+        teebee = TestBed(client, plan=theplan)
         teebee.setup()
         yield teebee
         teebee.teardown()

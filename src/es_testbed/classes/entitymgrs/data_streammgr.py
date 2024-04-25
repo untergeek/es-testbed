@@ -1,28 +1,28 @@
 """data_stream Entity Manager Class"""
 import typing as t
+from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
-from es_testbed.defaults import NAMEMAPPER
 from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import getlogger
 from .indexmgr import IndexMgr
 from .snapshotmgr import SnapshotMgr
 from ..entities import DataStream, Index
-from ..testplan import TestPlan
 
 # pylint: disable=missing-docstring,too-many-arguments,broad-exception-caught
 
 class DataStreamMgr(IndexMgr):
+    kind = 'data_stream'
+    listname = 'data_stream'
     def __init__(
             self,
             client: Elasticsearch = None,
-            plan: TestPlan = None,
+            plan: DotMap = None,
             autobuild: t.Optional[bool] = True,
             snapmgr: SnapshotMgr = None,
-            policy_name: str = None,
         ):
-        super().__init__(
-            client=client, plan=plan, autobuild=autobuild, snapmgr=snapmgr, policy_name=policy_name)
-        self.kind = 'data_stream'
+        self.ds = None
+        self.index_trackers = []
+        super().__init__(client=client, plan=plan, autobuild=autobuild, snapmgr=snapmgr)
         self.logger = getlogger('es_testbed.DataStreamMgr')
 
     @property
@@ -36,10 +36,6 @@ class DataStreamMgr(IndexMgr):
     def add(self, value):
         es_api.create_data_stream(self.client, value)
         self.track_data_stream()
-
-    # Some weird inheritance here was not picking up self.kind properly, so I override here
-    def ident(self, dkey='data_stream'):
-        return NAMEMAPPER[dkey]
 
     def searchable(self):
         """If the indices were marked as searchable snapshots, we do that now"""
@@ -69,7 +65,7 @@ class DataStreamMgr(IndexMgr):
     def track_data_stream(self) -> None:
         self.logger.debug('Tracking data_stream: %s', self.name)
         self.ds = DataStream(client=self.client, name=self.name)
-        self.entity_list.append(self.name)
+        self.appender(self.name)
 
     def track_index(self, name: str) -> None:
         self.logger.debug('Tracking index: %s', name)

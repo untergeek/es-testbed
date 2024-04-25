@@ -2,6 +2,7 @@
 # pylint: disable=missing-function-docstring,redefined-outer-name
 import typing as t
 import pytest
+from dotmap import DotMap
 from es_testbed import defaults as dft
 from es_testbed import exceptions as ex
 from es_testbed.helpers import utils as u
@@ -88,11 +89,16 @@ def test_build_ilm_policy_fail_repo():
 
 @pytest.fixture
 def fieldmatch():
-    def _fieldmatch(name: str, num: int):
-        return f'{name}{num}'
-    return _fieldmatch    
+    def _fieldmatch(val: str, num: int):
+        return f'{val}{num}'
+    return _fieldmatch
 
-# def test_doc_gen_matching(fieldmatch):
-#     fields = ['message', 'key', 'l3']
-#     for doc in u.doc_gen(count=2, start_at=0, match=True):
-#         assert doc[]
+def test_doc_gen_matching(fieldmatch):
+    i = 0
+    for res in u.doc_gen(count=3, start_at=0, match=True):
+        doc = DotMap(res)
+        tests = [(doc.message, 'message'), (doc.nested.key, 'nested'), (doc.deep.l1.l2.l3, 'deep')]
+        for test in tests:
+            dm, val = test
+            assert dm == fieldmatch(val, i)
+        i += 1

@@ -1,10 +1,14 @@
 """Base TestBed Class"""
 import typing as t
 from datetime import datetime, timezone
+from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
+from es_testbed.helpers.es_api import delete
 from es_testbed.helpers.utils import getlogger
-from .testplan import TestPlan
+from .plan import PlanBuilder
 from .tracker import Tracker
+
+# pylint: disable=broad-exception-caught
 
 class TestBed:
     """Base TestBed Class"""
@@ -12,19 +16,38 @@ class TestBed:
     def __init__(
             self,
             client: Elasticsearch = None,
-            plan: TestPlan = None,
+            plan: DotMap = None,
             autobuild: t.Optional[bool] = False,
         ):
         """Initialize"""
         self.logger = getlogger('es_testbed.TestBed')
         self.client = client
         if plan is None:
-            plan = TestPlan() # Use defaults
-        self.tracker = Tracker(client=client, plan=plan, autobuild=autobuild)
+            plan = PlanBuilder() # Use defaults
+        self.plan = plan
+        self.tracker = Tracker(
+            client=client, plan=plan, autobuild=autobuild)
+
+    def failsafe_teardown(self):
+        """Fallback method to delete things still remaining"""
+        items = ['index', 'data_stream', 'snapshot', 'template', 'component', 'ilm']
+        for i in items:
+            if i == 'snapshot':
+                snaps = ','.join(self.plan.failsafes[i])
+                self.client.snapshot.delete(snapshot=snaps, repository=self.plan.repository)
+            else:
+                self._loop_teardown(i, self.plan.failsafes[i])
 
     def ilm_polling(self, interval: t.Union[str, None] = None):
         """Return persistent cluster settings to speed up ILM polling during testing"""
         return {'indices.lifecycle.poll_interval': interval}
+
+    def _loop_teardown(self, kind: str, lst: t.Sequence[str]) -> None:
+        for item in lst:
+            try:
+                delete(self.client, kind, item)
+            except Exception as err:
+                self.logger.error('Tried deleting %s via %s. Error: %s', kind, item, err)
 
     def setup(self):
         """Setup the instance"""
@@ -39,6 +62,7 @@ class TestBed:
         """Tear down anything we created"""
         start = datetime.now(timezone.utc)
         self.tracker.teardown()
+        # Do we clean up the failsafes in the plan?
         self.logger.info('Restoring ILM polling to default: %s', self.ilm_polling(interval=None))
         self.client.cluster.put_settings(persistent=self.ilm_polling(interval=None))
         end = datetime.now(timezone.utc)

@@ -1,7 +1,7 @@
 """Test functions in es_testbed.TestBed"""
 # pylint: disable=redefined-outer-name,missing-function-docstring,missing-class-docstring
 import pytest
-from es_testbed import TestPlan, TestBed
+from es_testbed import PlanBuilder, TestBed
 from es_testbed.helpers.es_api import get_ds_current
 
 @pytest.fixture(scope='module')
@@ -9,21 +9,23 @@ def settings(prefix, uniq, repo):
     if not repo:
         pytest.skip('No snapshot repository', allow_module_level=True)
     return {
-        'type': 'data_streams',
+        'type': 'data_stream',
         'prefix': prefix,
         'uniq': uniq,
+        'repository': repo,
         'ilm': {
+            'enabled': True,
             'tiers': ['hot', 'frozen', 'delete'],
             'forcemerge': False,
             'max_num_segments': 1,
-            'repository': repo,
         }
     }
 
 class TestFrozenDataStream:
     @pytest.fixture(scope="class")
     def tb(self, client, settings):
-        teebee = TestBed(client, plan=TestPlan(settings=settings))
+        theplan = PlanBuilder(settings=settings).plan
+        teebee = TestBed(client, plan=theplan)
         teebee.setup()
         yield teebee
         teebee.teardown()
@@ -37,7 +39,7 @@ class TestFrozenDataStream:
 
     def test_first_backing(self, frozen, namecore, ymd, tb):
         idx = f'{frozen}.ds-{namecore('data_stream')}-{ymd}-000001'
-        assert tb.tracker.entities.indexlist[0] == idx
+        assert tb.tracker.entities.ds.backing_indices[0] == idx
 
     def test_write_index(self, tb, namecore):
         ds = f'{namecore('data_stream')}'

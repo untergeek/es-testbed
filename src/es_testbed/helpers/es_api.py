@@ -144,6 +144,8 @@ def do_snap(client: Elasticsearch, repo: str, snap: str, idx: str, tier: str='co
         repository=repo, snapshot=snap, index=idx, index_settings=get_routing(tier=tier),
         renamed_index=mounted_name(idx, tier), storage=storage_type(tier),
         wait_for_completion=True)
+    # Fix aliases
+    fix_aliases(client, idx, mounted_name(idx, tier))
 
 def exists(client: Elasticsearch, kind: str, name: str, repository: str=None) -> bool:
     """Return boolean existence of the named kind of object"""
