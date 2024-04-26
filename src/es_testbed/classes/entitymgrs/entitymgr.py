@@ -1,4 +1,5 @@
 """Entity Class Definition"""
+
 import typing as t
 from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
@@ -8,15 +9,14 @@ from es_testbed.helpers.utils import getlogger, uniq_values
 
 # pylint: disable=missing-docstring,broad-exception-caught,too-many-instance-attributes
 
+
 class EntityMgr:
     kind = 'entity_type'
     listname = 'entity_mgrs'
+
     def __init__(
-            self,
-            client: Elasticsearch = None,
-            plan: DotMap = None,
-            autobuild: t.Optional[bool] = True,
-        ):
+        self, client: t.Union[Elasticsearch, None] = None, plan: DotMap = None, autobuild: t.Optional[bool] = True
+    ):
         self.logger = getlogger('es_testbed.EntityMgr')
         self.client = client
         self.plan = plan
@@ -27,33 +27,43 @@ class EntityMgr:
     @property
     def entity_list(self):
         return self.plan[self.listname]
+
     @entity_list.setter
     def entity_list(self, value: t.Sequence) -> None:
         self.plan[self.listname] = value
+
     @property
     def entity_root(self) -> str:
         return f'{self.plan.prefix}-{self.ident()}-{self.plan.uniq}'
+
     @property
     def failsafe(self):
         return self.plan.failsafes[self.kind]
+
     @failsafe.setter
     def failsafe(self, value: t.Sequence) -> None:
         self.plan.failsafes[self.kind] = value
+
     @property
     def indexlist(self) -> t.Sequence[str]:
-        return [] # Empty attribute/property waiting to be overridden
+        return []  # Empty attribute/property waiting to be overridden
+
     @property
     def last(self) -> str:
-        return self.entity_list[-1] # Return the most recently appended item
+        return self.entity_list[-1]  # Return the most recently appended item
+
     @property
     def logdisplay(self) -> str:
         return self.kind
+
     @property
     def name(self) -> str:
         return f'{self.entity_root}{self.suffix}'
+
     @property
     def pattern(self) -> str:
         return f'*{self.entity_root}*'
+
     @property
     def suffix(self) -> str:
         return f'-{len(self.entity_list) + 1:06}'
@@ -64,13 +74,13 @@ class EntityMgr:
 
     def ident(self, dkey=None):
         if not dkey:
-            dkey=self.kind
+            dkey = self.kind
         return NAMEMAPPER[dkey]
 
-    def iterate_clean(self) -> None:
+    def iterate_clean(self) -> bool:
         succeed = True
         positions = []
-        for idx, entity in enumerate(self.entity_list): # There should only be one, but we cover it
+        for idx, entity in enumerate(self.entity_list):  # There should only be one, but we cover it
             value = entity
             if self.kind == 'index':
                 value = entity.name
@@ -84,10 +94,10 @@ class EntityMgr:
                 continue
             self.logger.debug('Deleted %s %s', self.logdisplay, value)
             positions.append(idx)
-        positions.sort() # Sort first to ensure lowest to highest order
-        for idx in reversed(positions): # Reverse the list and iterate
-            del self.entity_list[idx] # Delete the value at position idx
-            del self.plan.failsafes[self.kind][idx] # Delete the value at position idx
+        positions.sort()  # Sort first to ensure lowest to highest order
+        for idx in reversed(positions):  # Reverse the list and iterate
+            del self.entity_list[idx]  # Delete the value at position idx
+            del self.plan.failsafes[self.kind][idx]  # Delete the value at position idx
         return succeed
 
     def scan(self) -> t.Sequence[str]:
@@ -104,12 +114,9 @@ class EntityMgr:
     def teardown(self):
         display = PLURALMAP[self.kind] if self.kind in PLURALMAP else self.kind
         if not self.success:
-            msg = (
-                f'Setup did not complete successfully. '
-                f'Manual cleanup of {display}s may be necessary.'
-            )
+            msg = f'Setup did not complete successfully. ' f'Manual cleanup of {display}s may be necessary.'
             self.logger.warning(msg)
-        self.verify(correct=True) # Catch any entities that might exist but not be in entity_list
+        self.verify(correct=True)  # Catch any entities that might exist but not be in entity_list
         if self.entity_list:
             if self.iterate_clean():
                 self.logger.info('Cleanup of %ss completed successfully.', display)
@@ -117,10 +124,10 @@ class EntityMgr:
     def track_index(self, name: str) -> None:
         pass
 
-    def verify(self, correct: bool=False) -> t.Union[t.Sequence[str], None]:
+    def verify(self, correct: bool = False) -> t.Union[t.Sequence[str], None]:
         retval = None
         diffs = False
-        curr = self.scan() # This is what entity_list _should_ look like.
+        curr = self.scan()  # This is what entity_list _should_ look like.
         if self.kind == 'index':
             entities = self.indexlist
         else:
@@ -141,7 +148,7 @@ class EntityMgr:
                 if self.kind == 'index':
                     self.entity_list = []
                     for index in curr:
-                        self.track_index(index) # We have to re-create the tracked entities
+                        self.track_index(index)  # We have to re-create the tracked entities
                 else:
                     self.entity_list = curr
             else:

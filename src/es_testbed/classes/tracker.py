@@ -1,23 +1,20 @@
 """Tracker Class Definition"""
+
 import typing as t
 from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
 from es_testbed.helpers.utils import getlogger
-from .entitymgrs import (
-    ComponentMgr, DataStreamMgr, IlmMgr, IndexMgr, SnapshotMgr, TemplateMgr)
+from .entitymgrs import ComponentMgr, DataStreamMgr, IlmMgr, IndexMgr, SnapshotMgr, TemplateMgr
 
 # pylint: disable=missing-docstring,too-many-instance-attributes
 
 TYPEMAP = {'indices': IndexMgr, 'data_stream': DataStreamMgr}
 
+
 class Tracker:
     """Object for tracking entities created in TestBed"""
-    def __init__(
-            self,
-            client: Elasticsearch = None,
-            plan: DotMap = None,
-            autobuild: t.Optional[bool] = False,
-        ):
+
+    def __init__(self, client: Elasticsearch = None, plan: DotMap = None, autobuild: t.Optional[bool] = False):
         """Initialize"""
         self.logger = getlogger('es_testbed.Tracker')
         self.client = client

@@ -1,4 +1,5 @@
 """Index Entity Class"""
+
 import typing as t
 from elasticsearch8 import Elasticsearch
 from es_testbed.helpers import es_api
@@ -7,13 +8,10 @@ from . import Alias
 
 # pylint: disable=missing-docstring,too-many-arguments
 
+
 class DataStream(Alias):
-    def __init__(
-            self,
-            client: Elasticsearch = None,
-            name: str = None,
-            autobuild: t.Optional[bool] = True,
-        ):
+
+    def __init__(self, client: Elasticsearch = None, name: str = None, autobuild: t.Optional[bool] = True):
         super().__init__(client=client, name=name, autobuild=autobuild)
         self.logger = getlogger('es_testbed.Data_Stream')
         self.index_tracker = []

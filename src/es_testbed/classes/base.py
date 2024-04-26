@@ -1,4 +1,5 @@
 """Base TestBed Class"""
+
 import typing as t
 from datetime import datetime, timezone
 from dotmap import DotMap
@@ -10,23 +11,20 @@ from .tracker import Tracker
 
 # pylint: disable=broad-exception-caught
 
+
 class TestBed:
     """Base TestBed Class"""
+
     __test__ = False
-    def __init__(
-            self,
-            client: Elasticsearch = None,
-            plan: DotMap = None,
-            autobuild: t.Optional[bool] = False,
-        ):
+
+    def __init__(self, client: Elasticsearch = None, plan: DotMap = None, autobuild: t.Optional[bool] = False):
         """Initialize"""
         self.logger = getlogger('es_testbed.TestBed')
         self.client = client
         if plan is None:
-            plan = PlanBuilder() # Use defaults
+            plan = PlanBuilder().plan  # Use defaults
         self.plan = plan
-        self.tracker = Tracker(
-            client=client, plan=plan, autobuild=autobuild)
+        self.tracker = Tracker(client=client, plan=plan, autobuild=autobuild)
 
     def failsafe_teardown(self):
         """Fallback method to delete things still remaining"""
@@ -61,7 +59,13 @@ class TestBed:
     def teardown(self):
         """Tear down anything we created"""
         start = datetime.now(timezone.utc)
-        self.tracker.teardown()
+        try:
+            self.tracker.teardown()
+        except Exception as err:
+            self.logger.error('An exception occurred during teardown: %s', err)
+            self.logger.info('Remaining entities: %s', self.plan)
+            self.logger.info('Attempting failsafe cleanup...')
+            self.failsafe_teardown()
         # Do we clean up the failsafes in the plan?
         self.logger.info('Restoring ILM polling to default: %s', self.ilm_polling(interval=None))
         self.client.cluster.put_settings(persistent=self.ilm_polling(interval=None))

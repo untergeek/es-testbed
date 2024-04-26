@@ -1,4 +1,5 @@
 """Alias Entity Class"""
+
 import typing as t
 from elasticsearch8 import Elasticsearch
 from es_testbed.helpers.utils import getlogger
@@ -7,13 +8,10 @@ from .entity import Entity
 
 # pylint: disable=missing-docstring,too-many-arguments
 
+
 class Alias(Entity):
-    def __init__(
-            self,
-            client: Elasticsearch,
-            name: str = None,
-            autobuild: t.Optional[bool] = True,
-        ):
+
+    def __init__(self, client: Elasticsearch, name: str = None, autobuild: t.Optional[bool] = True):
         super().__init__(client=client, name=name, autobuild=autobuild)
         self.logger = getlogger('es_testbed.Alias')
 

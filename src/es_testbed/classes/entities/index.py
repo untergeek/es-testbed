@@ -1,4 +1,5 @@
 """Index Entity Class"""
+
 import typing as t
 from os import getenv
 from elasticsearch8 import Elasticsearch
@@ -9,20 +10,23 @@ from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import getlogger, mounted_name
 from .entity import Entity
 from ..ilm import IlmTracker
+
 PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 TIMEOUT_VALUE = float(getenv(TIMEOUT_ENVVAR, default=TIMEOUT_DEFAULT))
 
 # pylint: disable=missing-docstring,too-many-arguments
 
+
 class Index(Entity):
+
     def __init__(
-            self,
-            client: Elasticsearch = None,
-            name: str = None,
-            autobuild: t.Optional[bool] = True,
-            snapmgr = None,
-            policy_name: str = None,
-        ):
+        self,
+        client: Elasticsearch = None,
+        name: str = None,
+        autobuild: t.Optional[bool] = True,
+        snapmgr=None,
+        policy_name: str = None,
+    ):
         super().__init__(client=client, name=name, autobuild=autobuild)
         self.logger = getlogger('es_testbed.Index')
         self.policy_name = policy_name
@@ -37,7 +41,7 @@ class Index(Entity):
         curr = self.ilm_tracker.explain.phase
         if not bool(('cold' in phases) or ('frozen' in phases)):
             self.logger.info('ILM Policy for "%s" has no cold/frozen phases', self.name)
-            target = curr # Keep the same
+            target = curr  # Keep the same
         if bool(('cold' in phases) and ('frozen' in phases)):
             if self.ilm_tracker.pname(curr) < self.ilm_tracker.pname('cold'):
                 target = 'cold'
@@ -64,14 +68,13 @@ class Index(Entity):
             # At this point, it's "in" a searchable tier, but the index name hasn't changed yet
             newidx = mounted_name(self.name, target)
             self.logger.debug('Waiting for ILM phase change to complete. New index: %s', newidx)
-            kwargs = {
-                'name': newidx, 'kind': 'index', 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
+            kwargs = {'name': newidx, 'kind': 'index', 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
             test = Exists(self.client, **kwargs)
             test.wait_for_it()
             self.logger.info('ILM advance to phase %s completed', target)
-            self.aka.append(self.name) # Append the old name to the AKA list
+            self.aka.append(self.name)  # Append the old name to the AKA list
             self.name = newidx
-            self.track_ilm(self.name) # Refresh the ilm_tracker with the new index name
+            self.track_ilm(self.name)  # Refresh the ilm_tracker with the new index name
             current, target = self.phase_tuple
 
     def manual_ss(self, scheme) -> None:
@@ -85,10 +88,9 @@ class Index(Entity):
         """If the index is planned to become a searchable snapshot, we do that now"""
         self.logger.debug('Checking if %s should be a searchable snapshot', self.name)
         if self.am_i_write_idx:
-            self.logger.info(
-                '%s is the write_index. Cannot mount as searchable snapshot', self.name)
+            self.logger.info('%s is the write_index. Cannot mount as searchable snapshot', self.name)
             return
-        if not self.policy_name: # If we have this, chances are we have a policy
+        if not self.policy_name:  # If we have this, chances are we have a policy
             self.logger.debug('No ILM policy found. Switching to manual mode')
             self.manual_ss(scheme)
             return
@@ -100,8 +102,7 @@ class Index(Entity):
             # At this point, it's "in" a searchable tier, but the index name hasn't changed yet
             newidx = mounted_name(self.name, target)
             self.logger.debug('Waiting for ILM phase change to complete. New index: %s', newidx)
-            kwargs = {
-                'name': newidx, 'kind': 'index', 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
+            kwargs = {'name': newidx, 'kind': 'index', 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
             test = Exists(self.client, **kwargs)
             test.wait_for_it()
             try:
@@ -118,9 +119,9 @@ class Index(Entity):
             snapname = es_api.snapshot_name(self.client, newidx)
             self.logger.debug('Snapshot %s backs %s', snapname, newidx)
             self.snapmgr.add_existing(snapname)
-            self.aka.append(self.name) # Append the old name to the AKA list
+            self.aka.append(self.name)  # Append the old name to the AKA list
             self.name = newidx
-            self.track_ilm(self.name) # Refresh the ilm_tracker with the new index name
+            self.track_ilm(self.name)  # Refresh the ilm_tracker with the new index name
 
     def track_ilm(self, name: str) -> None:
         """

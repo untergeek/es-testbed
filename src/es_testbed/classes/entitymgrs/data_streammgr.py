@@ -1,4 +1,5 @@
 """data_stream Entity Manager Class"""
+
 import typing as t
 from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
@@ -10,23 +11,25 @@ from ..entities import DataStream, Index
 
 # pylint: disable=missing-docstring,too-many-arguments,broad-exception-caught
 
+
 class DataStreamMgr(IndexMgr):
     kind = 'data_stream'
     listname = 'data_stream'
+
     def __init__(
-            self,
-            client: Elasticsearch = None,
-            plan: DotMap = None,
-            autobuild: t.Optional[bool] = True,
-            snapmgr: SnapshotMgr = None,
-        ):
+        self,
+        client: Elasticsearch = None,
+        plan: DotMap = None,
+        autobuild: t.Optional[bool] = True,
+        snapmgr: SnapshotMgr = None,
+    ):
         self.ds = None
         self.index_trackers = []
         super().__init__(client=client, plan=plan, autobuild=autobuild, snapmgr=snapmgr)
         self.logger = getlogger('es_testbed.DataStreamMgr')
 
     @property
-    def suffix(self): # Remapping this to send no suffix for data_streams
+    def suffix(self):  # Remapping this to send no suffix for data_streams
         return ''
 
     @property
@@ -45,7 +48,7 @@ class DataStreamMgr(IndexMgr):
         self.logger.info('data_stream backing indices: %s', self.ds.backing_indices)
 
     def setup(self) -> bool:
-        self.index_trackers = [] # Inheritance oddity requires redeclaration here
+        self.index_trackers = []  # Inheritance oddity requires redeclaration here
         for scheme in self.plan.entities:
             if not self.entity_list:
                 self.add(self.name)
@@ -69,10 +72,5 @@ class DataStreamMgr(IndexMgr):
 
     def track_index(self, name: str) -> None:
         self.logger.debug('Tracking index: %s', name)
-        entity = Index(
-            client=self.client,
-            name=name,
-            snapmgr=self.snapmgr,
-            policy_name=self.policy_name
-        )
+        entity = Index(client=self.client, name=name, snapmgr=self.snapmgr, policy_name=self.policy_name)
         self.index_trackers.append(entity)

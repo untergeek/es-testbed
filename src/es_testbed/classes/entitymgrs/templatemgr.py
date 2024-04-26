@@ -1,4 +1,5 @@
 """Index Template Entity Manager Class"""
+
 import typing as t
 from dotmap import DotMap
 from elasticsearch8 import Elasticsearch
@@ -9,15 +10,14 @@ from .entitymgr import EntityMgr
 
 # pylint: disable=missing-docstring,too-many-arguments
 
+
 class TemplateMgr(EntityMgr):
     kind = 'template'
     listname = 'index_templates'
+
     def __init__(
-            self,
-            client: Elasticsearch = None,
-            plan: DotMap = None,
-            autobuild: t.Optional[bool] = True,
-        ):
+        self, client: t.Union[Elasticsearch, None] = None, plan: DotMap = None, autobuild: t.Optional[bool] = True
+    ):
         super().__init__(client=client, plan=plan, autobuild=autobuild)
         self.logger = getlogger('es_testbed.TemplateMgr')
 
@@ -38,15 +38,10 @@ class TemplateMgr(EntityMgr):
     def setup(self):
         ds = {} if self.plan.type == 'data_stream' else None
         es_api.put_idx_tmpl(
-            self.client,
-            self.name,
-            self.patterns,
-            components=self.plan.component_templates,
-            data_stream=ds
+            self.client, self.name, self.patterns, components=self.plan.component_templates, data_stream=ds
         )
         if not es_api.exists(self.client, self.kind, self.name):
-            raise ResultNotExpected(
-                f'Unable to verify creation of index template {self.name}')
+            raise ResultNotExpected(f'Unable to verify creation of index template {self.name}')
         self.appender(self.name)
         self.logger.debug('Successfully created index template: %s', self.last)
         self.success = True

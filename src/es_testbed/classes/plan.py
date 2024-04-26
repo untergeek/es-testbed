@@ -1,17 +1,16 @@
 """TestPlan Class Definition"""
+
 import typing as t
 from dotmap import DotMap
 from es_testbed.defaults import TESTPLAN
 from es_testbed.helpers.utils import build_ilm_policy, getlogger, randomstr
+
 # pylint: disable=missing-docstring
 
+
 class PlanBuilder:
-    def __init__(
-            self,
-            settings: t.Dict = None,
-            default_entities: bool = True,
-            autobuild: t.Optional[bool] = True,
-        ):
+
+    def __init__(self, settings: t.Dict = None, default_entities: bool = True, autobuild: t.Optional[bool] = True):
         self.logger = getlogger('es_testbed.PlanBuilder')
         self.default_entities = default_entities
         if settings is None:
@@ -21,7 +20,7 @@ class PlanBuilder:
         if autobuild:
             self.setup()
 
-        ### Example settings
+        # ## Example settings
         # settings={
         #   'type': 'indices',       # Default is indices? Or should it be data_streams?
         #   'prefix': 'es-testbed',  # Provide this value as a default
@@ -38,8 +37,8 @@ class PlanBuilder:
         #     'max_num_segments': 1,
         #   }
         #
-        ## If these keys aren't specified per entity, then all entities will get this treatment
-        ## EXCEPT for the is_write_index for aliases and data_streams
+        # # If these keys aren't specified per entity, then all entities will get this treatment
+        # # EXCEPT for the is_write_index for aliases and data_streams
         #
         #   'defaults': {
         #     'entity_count': 3,
@@ -48,8 +47,8 @@ class PlanBuilder:
         #     'searchable': tier...
         #   }
         #
-        ## Manually specifying entities makes sense for individual indices, but not so much for
-        ## alias-backed indices or data_streams
+        # # Manually specifying entities makes sense for individual indices, but not so much for
+        # # alias-backed indices or data_streams
         #   'entities': [
         #    {
         #      'docs': 10,
@@ -81,25 +80,27 @@ class PlanBuilder:
 
     def _create_lists(self):
         names = [
-            'indices', 'data_stream', 'snapshots', 'ilm_policies', 'index_templates',
-            'component_templates', 'entity_mgrs'
+            'indices',
+            'data_stream',
+            'snapshots',
+            'ilm_policies',
+            'index_templates',
+            'component_templates',
+            'entity_mgrs',
         ]
         for name in names:
             self._plan[name] = []
 
     def add_entity(
-            self,
-            docs: t.Optional[int] = 10,
-            match: t.Optional[bool] = True,
-            searchable: t.Optional[str] = None
-        ) -> None:
+        self, docs: t.Optional[int] = 10, match: t.Optional[bool] = True, searchable: t.Optional[str] = None
+    ) -> None:
         entity = {'docs': docs, 'match': match}
         if searchable:
             entity['searchable'] = searchable
         self._plan.entities.append(entity)
 
     def make_default_entities(self) -> None:
-        defs = TESTPLAN['defaults'] # Start with defaults
+        defs = TESTPLAN['defaults']  # Start with defaults
         if 'defaults' in self._plan:
             defs = self._plan.defaults
         kwargs = {'docs': defs['docs'], 'match': defs['match'], 'searchable': defs['searchable']}
@@ -111,7 +112,7 @@ class PlanBuilder:
         self._plan.uniq = randomstr(length=8, lowercase=True)
         self._create_lists()
         self._create_failsafes()
-        self.update(self.settings) # Override with settings.
+        self.update(self.settings)  # Override with settings.
         self.update_rollover_alias()
         self.update_ilm()
         if not self._plan.entities:
@@ -150,7 +151,7 @@ class PlanBuilder:
                     ilm.tiers.append(entity['searchable'])
         kwargs = {
             'tiers': ilm.tiers,
-            'forcemerge': ilm.forcemerge, 
+            'forcemerge': ilm.forcemerge,
             'max_num_segments': ilm.max_num_segments,
             'repository': self._plan.repository,
         }

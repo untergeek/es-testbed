@@ -1,4 +1,5 @@
 """ILM Defining Class"""
+
 import typing as t
 from os import getenv
 from time import sleep
@@ -8,11 +9,12 @@ from es_testbed.defaults import PAUSE_ENVVAR, PAUSE_DEFAULT
 from es_testbed.exceptions import NameChanged, ResultNotExpected, TestbedMisconfig
 from es_testbed.helpers import es_api
 from es_testbed.helpers.utils import getlogger
+
 PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 
 # pylint: disable=missing-docstring
 
-### Example ILM explain output
+# ## Example ILM explain output
 # {
 #     'action': 'complete',
 #     'action_time_millis': 0,
@@ -45,11 +47,13 @@ PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
 #     'time_since_index_creation': '5.65m'
 # }
 
+
 class IlmTracker:
+
     def __init__(self, client: Elasticsearch, name: str):
         self.logger = getlogger('es_testbed.IlmTracker')
         self.client = client
-        self.name = self.resolve(name) # A single index name
+        self.name = self.resolve(name)  # A single index name
         self._explain = DotMap(self.get_explain_data())
         self._phases = es_api.get_ilm_phases(self.client, self._explain.policy)
 
@@ -71,10 +75,10 @@ class IlmTracker:
         if self._explain.phase == 'delete':
             self.logger.warning('Already on "delete" phase. No more phases to advance')
         else:
-            curr = self.pnum(self._explain.phase) # A numeric representation of the current phase
+            curr = self.pnum(self._explain.phase)  # A numeric representation of the current phase
             # A list of any remaining phases in the policy with a higher number than the current
             remaining = [self.pnum(x) for x in self.policy_phases if self.pnum(x) > curr]
-            if remaining: # If any:
+            if remaining:  # If any:
                 retval = self.pname(remaining[0])
                 # Get the phase name from the number stored in the first element
         return retval
@@ -83,10 +87,12 @@ class IlmTracker:
     def policy_phases(self) -> t.Sequence[str]:
         return list(self._phases.keys())
 
-    def advance(self, phase: str=None, action: str=None, name: str=None) -> None:
+    def advance(
+        self, phase: t.Union[str, None] = None, action: t.Union[str, None] = None, name: t.Union[str, None] = None
+    ) -> None:
         def wait(phase: str) -> None:
             counter = 0
-            sleep(1.5) # Initial wait since we set ILM to poll every second
+            sleep(1.5)  # Initial wait since we set ILM to poll every second
             while self._explain.phase != phase:
                 sleep(PAUSE_VALUE)
                 self.update()
@@ -127,7 +133,9 @@ class IlmTracker:
             self.logger.critical(msg)
             raise ResultNotExpected(msg) from err
 
-    def next_step(self, phase: str=None, action: str=None, name: str=None) -> t.Dict:
+    def next_step(
+        self, phase: t.Union[str, None] = None, action: t.Union[str, None] = None, name: t.Union[str, None] = None
+    ) -> t.Dict:
         err1 = bool((action is not None) and (name is None))
         err2 = bool((action is None) and (name is not None))
         if err1 or err2:
@@ -174,14 +182,11 @@ class IlmTracker:
         counter = 0
         self.logger.debug('Waiting for current action and step to complete')
         self.logger.debug('Action: %s --- Step: %s', self._explain.action, self._explain.step)
-        while not bool(
-                    self._explain.action == 'complete' and
-                    self._explain.step == 'complete'):
+        while not bool(self._explain.action == 'complete' and self._explain.step == 'complete'):
             counter += 1
             sleep(PAUSE_VALUE)
             if counter % 10 == 0:
-                self.logger.debug(
-                    'Action: %s --- Step: %s', self._explain.action, self._explain.step)
+                self.logger.debug('Action: %s --- Step: %s', self._explain.action, self._explain.step)
             try:
                 self.count_logging(counter)
             except ResultNotExpected as err:

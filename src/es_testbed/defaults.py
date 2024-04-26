@@ -1,5 +1,7 @@
 """Default values and constants"""
+
 import typing as t
+
 # pylint: disable=missing-function-docstring
 
 EPILOG: str = 'Learn more at https://github.com/untergeek/es-testbed'
@@ -19,9 +21,7 @@ MAPPING: dict = {
         'message': {'type': 'keyword'},
         'number': {'type': 'long'},
         'nested': {'properties': {'key': {'type': 'keyword'}}},
-        'deep': {'properties': {'l1': {'properties': {'l2': {
-            'properties': {'l3': {'type': 'keyword'}}}}}}
-        }
+        'deep': {'properties': {'l1': {'properties': {'l2': {'properties': {'l3': {'type': 'keyword'}}}}}}},
     }
 }
 
@@ -47,12 +47,7 @@ TESTPLAN: dict = {
     'prefix': 'es-testbed',
     'repository': None,
     'rollover_alias': None,
-    'ilm': {
-        'enabled': False,
-        'tiers': ['hot', 'delete'],
-        'forcemerge': False,
-        'max_num_segments': 1
-    },
+    'ilm': {'enabled': False, 'tiers': ['hot', 'delete'], 'forcemerge': False, 'max_num_segments': 1},
     'defaults': {
         'entity_count': 3,
         'docs': 10,
@@ -63,12 +58,8 @@ TESTPLAN: dict = {
 }
 
 TIER: dict = {
-    'hot': {
-        'pref': 'data_hot,data_content'
-    },
-    'warm': {
-        'pref': 'data_warm,data_hot,data_content'
-    },
+    'hot': {'pref': 'data_hot,data_content'},
+    'warm': {'pref': 'data_warm,data_hot,data_content'},
     'cold': {
         'pref': 'data_cold,data_warm,data_hot,data_content',
         'prefix': 'restored',
@@ -78,33 +69,34 @@ TIER: dict = {
         'pref': 'data_frozen',
         'prefix': 'partial',
         'storage': 'shared_cache',
-    }
+    },
 }
 
 TIMEOUT_DEFAULT: str = '30'
 TIMEOUT_ENVVAR: str = 'ES_TESTBED_TIMEOUT'
 
-IlmPhase: t.TypeAlias = (
-    t.Dict[str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]]
-)
+IlmPhase: t.TypeAlias = t.Dict[str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]]
+
 
 def ilmhot() -> IlmPhase:
-    return {
-        'actions': {
-            'rollover': {
-                'max_primary_shard_size': '1gb',
-                'max_age': '1d'
-            }
-        }
-    }
+    return {'actions': {'rollover': {'max_primary_shard_size': '1gb', 'max_age': '1d'}}}
+
+
 def ilmwarm() -> IlmPhase:
     return {'min_age': '2d', 'actions': {}}
+
+
 def ilmcold() -> IlmPhase:
-    return  {'min_age': '3d', 'actions': {}}
+    return {'min_age': '3d', 'actions': {}}
+
+
 def ilmfrozen() -> IlmPhase:
     return {'min_age': '4d', 'actions': {}}
+
+
 def ilmdelete() -> IlmPhase:
     return {'min_age': '5d', 'actions': {'delete': {}}}
+
 
 def ilm_phase(tier):
     """Return the default phase step based on 'tier'"""
@@ -116,6 +108,7 @@ def ilm_phase(tier):
         'delete': ilmdelete(),
     }
     return {tier: phase_map[tier]}
+
 
 def ilm_force_merge(max_num_segments=1):
     """Return an ILM policy force merge action block using max_num_segments"""
