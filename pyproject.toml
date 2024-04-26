@@ -190,6 +190,7 @@ exclude = [
     'examples',
     'html_docs',
     'tests',
+    'pytest.ini',
 ]
 
 [tool.hatch.envs.test]
