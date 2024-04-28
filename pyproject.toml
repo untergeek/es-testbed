@@ -33,7 +33,7 @@ keywords = [
 dependencies = [
     'dotmap==1.3.30',
     'es_client==8.13.3',
-    'es-wait==0.3.3',
+    'es-wait==0.3.5',
 ]
 
 [project.optional-dependencies]
@@ -107,8 +107,9 @@ all = [
 
 [tool.black]
 target-version = ['py38']
-line-length = 120
+line-length = 88
 skip-string-normalization = true
+include = '\.pyi?$'
 
 [tool.ruff]
 target-version = 'py38'

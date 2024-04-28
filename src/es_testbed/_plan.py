@@ -2,21 +2,27 @@
 
 import typing as t
 from dotmap import DotMap
-from es_testbed.defaults import TESTPLAN
-from es_testbed.helpers.utils import build_ilm_policy, getlogger, randomstr
+from .defaults import TESTPLAN
+from .helpers.utils import build_ilm_policy, getlogger, randomstr
 
 # pylint: disable=missing-docstring
 
 
 class PlanBuilder:
 
-    def __init__(self, settings: t.Dict = None, default_entities: bool = True, autobuild: t.Optional[bool] = True):
+    def __init__(
+        self,
+        settings: t.Dict = None,
+        default_entities: bool = True,
+        autobuild: t.Optional[bool] = True,
+    ):
         self.logger = getlogger('es_testbed.PlanBuilder')
         self.default_entities = default_entities
         if settings is None:
             settings = TESTPLAN
         self.settings = settings
         self._plan = DotMap(TESTPLAN)
+        self._plan.cleanup = 'UNKNOWN'  # Future use?
         if autobuild:
             self.setup()
 
@@ -25,10 +31,10 @@ class PlanBuilder:
         #   'type': 'indices',       # Default is indices? Or should it be data_streams?
         #   'prefix': 'es-testbed',  # Provide this value as a default
         #   'rollover_alias': False, # Only respected if 'type' == 'indices'.
-        #                            # Will rollover after creation and filling 1st index
-        #                            # If True, will be overridden to value of alias name
+        #                            # Will rollover after creation and filling 1st
+        #                            # If True, will be overridden to value of alias
         #                            # If False, will be overridden with None
-        #   'uniq': 'my-unique-str', # If not provided, randomstr(length=8, lowercase=True)
+        #   'uniq': 'my-unique-str', # If not provided, randomstr()
         #   'repository':            # Only used for cold/frozen tier for snapshots
         #   'ilm': {                 # All of these ILM values are defaults
         #     'enabled': False,
@@ -37,7 +43,8 @@ class PlanBuilder:
         #     'max_num_segments': 1,
         #   }
         #
-        # # If these keys aren't specified per entity, then all entities will get this treatment
+        # # If these keys aren't specified per entity, then all entities will get this
+        # # treatment
         # # EXCEPT for the is_write_index for aliases and data_streams
         #
         #   'defaults': {
@@ -47,7 +54,8 @@ class PlanBuilder:
         #     'searchable': tier...
         #   }
         #
-        # # Manually specifying entities makes sense for individual indices, but not so much for
+        # # Manually specifying entities makes sense for individual indices, but not so
+        # # much for
         # # alias-backed indices or data_streams
         #   'entities': [
         #    {
@@ -69,16 +77,10 @@ class PlanBuilder:
         # }
 
     @property
-    def plan(self):
+    def plan(self) -> DotMap:
         return self._plan
 
-    def _create_failsafes(self):
-        self._plan.failsafes = DotMap()
-        items = ['index', 'data_stream', 'snapshot', 'ilm', 'template', 'component', 'entity_type']
-        for i in items:
-            self._plan.failsafes[i] = []
-
-    def _create_lists(self):
+    def _create_lists(self) -> None:
         names = [
             'indices',
             'data_stream',
@@ -86,13 +88,15 @@ class PlanBuilder:
             'ilm_policies',
             'index_templates',
             'component_templates',
-            'entity_mgrs',
         ]
         for name in names:
             self._plan[name] = []
 
     def add_entity(
-        self, docs: t.Optional[int] = 10, match: t.Optional[bool] = True, searchable: t.Optional[str] = None
+        self,
+        docs: t.Optional[int] = 10,
+        match: t.Optional[bool] = True,
+        searchable: t.Optional[str] = None,
     ) -> None:
         entity = {'docs': docs, 'match': match}
         if searchable:
@@ -103,15 +107,20 @@ class PlanBuilder:
         defs = TESTPLAN['defaults']  # Start with defaults
         if 'defaults' in self._plan:
             defs = self._plan.defaults
-        kwargs = {'docs': defs['docs'], 'match': defs['match'], 'searchable': defs['searchable']}
+        kwargs = {
+            'docs': defs['docs'],
+            'match': defs['match'],
+            'searchable': defs['searchable'],
+        }
         for _ in range(0, defs['entity_count']):
             self.add_entity(**kwargs)
-        self.logger.debug('Plan will create %s (backing) indices', len(self._plan.entities))
+        self.logger.debug(
+            'Plan will create %s (backing) indices', len(self._plan.entities)
+        )
 
     def setup(self) -> None:
         self._plan.uniq = randomstr(length=8, lowercase=True)
         self._create_lists()
-        self._create_failsafes()
         self.update(self.settings)  # Override with settings.
         self.update_rollover_alias()
         self.update_ilm()
@@ -134,11 +143,15 @@ class PlanBuilder:
         if isinstance(self._plan.ilm, DotMap):
             if 'enabled' not in self._plan.ilm:
                 # Override with defaults
-                self.logger.debug('plan.ilm does not have key "enabled". Overriding with defaults')
+                self.logger.debug(
+                    'plan.ilm does not have key "enabled". Overriding with defaults'
+                )
                 setdefault = True
         elif isinstance(self._plan.ilm, bool):
             if self._plan.ilm:
-                self.logger.warning('"plan.ilm: True" is incorrect. Use plan.ilm.enabled: True')
+                self.logger.warning(
+                    '"plan.ilm: True" is incorrect. Use plan.ilm.enabled: True'
+                )
             self.logger.debug('plan.ilm is boolean. Overriding with defaults')
             setdefault = True
         if setdefault:

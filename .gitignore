@@ -10,6 +10,8 @@ __pycache__/
 
 
 .flake8
+pylintrc
+pylintrc.toml
 
 # Distribution / packaging
 .Python
@@ -145,6 +147,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+mypy.ini
 .dmypy.json
 dmypy.json
 

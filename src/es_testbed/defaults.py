@@ -21,7 +21,13 @@ MAPPING: dict = {
         'message': {'type': 'keyword'},
         'number': {'type': 'long'},
         'nested': {'properties': {'key': {'type': 'keyword'}}},
-        'deep': {'properties': {'l1': {'properties': {'l2': {'properties': {'l3': {'type': 'keyword'}}}}}}},
+        'deep': {
+            'properties': {
+                'l1': {
+                    'properties': {'l2': {'properties': {'l3': {'type': 'keyword'}}}}
+                }
+            }
+        },
     }
 }
 
@@ -47,7 +53,12 @@ TESTPLAN: dict = {
     'prefix': 'es-testbed',
     'repository': None,
     'rollover_alias': None,
-    'ilm': {'enabled': False, 'tiers': ['hot', 'delete'], 'forcemerge': False, 'max_num_segments': 1},
+    'ilm': {
+        'enabled': False,
+        'tiers': ['hot', 'delete'],
+        'forcemerge': False,
+        'max_num_segments': 1,
+    },
     'defaults': {
         'entity_count': 3,
         'docs': 10,
@@ -75,7 +86,9 @@ TIER: dict = {
 TIMEOUT_DEFAULT: str = '30'
 TIMEOUT_ENVVAR: str = 'ES_TESTBED_TIMEOUT'
 
-IlmPhase: t.TypeAlias = t.Dict[str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]]
+IlmPhase: t.TypeAlias = t.Dict[
+    str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]
+]
 
 
 def ilmhot() -> IlmPhase:

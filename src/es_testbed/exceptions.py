@@ -7,6 +7,8 @@ class TestbedException(Exception):  # parent exception
     or es_client exceptions.
     """
 
+    __test__ = False
+
 
 class MissingArgument(TestbedException):
     """
@@ -31,17 +33,23 @@ class TestbedFailure(TestbedException):
     Whatever we were trying to do failed.
     """
 
+    __test__ = False
+
 
 class TestbedMisconfig(TestbedException):
     """
     There was a misconfiguration encountered.
     """
 
+    __test__ = False
+
 
 class TestPlanMisconfig(TestbedMisconfig):
     """
     There was a misconfiguration in a TestPlan.
     """
+
+    __test__ = False
 
 
 class TimeoutException(TestbedException):

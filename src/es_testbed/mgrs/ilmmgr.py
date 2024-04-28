@@ -1,12 +1,14 @@
 """ILM Policy Entity Manager Class"""
 
 import typing as t
-from dotmap import DotMap
-from elasticsearch8 import Elasticsearch
-from es_testbed.exceptions import ResultNotExpected
-from es_testbed.helpers import es_api
-from es_testbed.helpers.utils import build_ilm_policy, getlogger
 from .entitymgr import EntityMgr
+from ..exceptions import ResultNotExpected
+from ..helpers.es_api import exists, put_ilm
+from ..helpers.utils import build_ilm_policy, getlogger
+
+if t.TYPE_CHECKING:
+    from elasticsearch8 import Elasticsearch
+    from dotmap import DotMap
 
 # pylint: disable=missing-docstring
 
@@ -15,15 +17,17 @@ class IlmMgr(EntityMgr):
     kind = 'ilm'
     listname = 'ilm_policies'
 
-    def __init__(self, client: Elasticsearch = None, plan: DotMap = None, autobuild: t.Optional[bool] = True):
-        super().__init__(client=client, plan=plan, autobuild=autobuild)
+    def __init__(
+        self,
+        client: t.Union['Elasticsearch', None] = None,
+        plan: t.Union['DotMap', None] = None,
+        autobuild: t.Optional[bool] = True,
+    ):
         self.logger = getlogger('es_testbed.IlmMgr')
+        super().__init__(client=client, plan=plan, autobuild=autobuild)
 
-    @property
-    def logdisplay(self) -> str:
-        return 'ILM policy'
-
-    def get_policy(self):
+    def get_policy(self) -> t.Dict:
+        """Return the configured ILM policy"""
         d = self.plan.ilm
         kwargs = {
             'tiers': d.tiers,
@@ -33,13 +37,16 @@ class IlmMgr(EntityMgr):
         }
         return build_ilm_policy(**kwargs)
 
-    def setup(self):
+    def setup(self) -> None:
+        """Setup the entity manager"""
         if self.plan.ilm.enabled:
             self.plan.ilm.policy = self.get_policy()
-            es_api.put_ilm(self.client, self.name, policy=self.plan.ilm.policy)
+            put_ilm(self.client, self.name, policy=self.plan.ilm.policy)
             # Verify existence
-            if not es_api.exists(self.client, 'ilm', self.name):
-                raise ResultNotExpected(f'Unable to verify creation of ilm policy {self.name}')
+            if not exists(self.client, 'ilm', self.name):
+                raise ResultNotExpected(
+                    f'Unable to verify creation of ilm policy {self.name}'
+                )
             # This goes first because the length of entity_list determines the suffix
             self.appender(self.name)
             self.logger.info('Successfully created ILM policy: %s', self.last)
