@@ -22,6 +22,12 @@ class NameChanged(TestbedException):
     """
 
 
+class StepChanged(TestbedException):
+    """
+    The current step changed since the initial API call was formed
+    """
+
+
 class ResultNotExpected(TestbedException):
     """
     The result we got is not what we expected

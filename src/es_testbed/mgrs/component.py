@@ -1,19 +1,22 @@
 """Component Template Entity Manager Class"""
 
 import typing as t
-from .entitymgr import EntityMgr
-from ..exceptions import ResultNotExpected
-from ..helpers.es_api import exists, put_comp_tmpl
-from ..helpers.utils import getlogger, mapping_component, setting_component
+import logging
+from es_testbed.exceptions import ResultNotExpected
+from es_testbed.helpers.es_api import exists, put_comp_tmpl
+from es_testbed.helpers.utils import mapping_component, prettystr, setting_component
+from es_testbed.mgrs.entity import EntityMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
     from dotmap import DotMap
 
-# pylint: disable=missing-docstring,too-many-arguments
+logger = logging.getLogger(__name__)
 
 
 class ComponentMgr(EntityMgr):
+    """Component Template Entity Manager Class"""
+
     kind = 'component'
     listname = 'component_templates'
 
@@ -21,10 +24,8 @@ class ComponentMgr(EntityMgr):
         self,
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
-        autobuild: t.Optional[bool] = True,
     ):
-        self.logger = getlogger('es_testbed.ComponentMgr')
-        super().__init__(client=client, plan=plan, autobuild=autobuild)
+        super().__init__(client=client, plan=plan)
 
     @property
     def components(self) -> t.Sequence[t.Dict]:
@@ -47,7 +48,7 @@ class ComponentMgr(EntityMgr):
                     f'Unable to verify creation of component template {self.name}'
                 )
             self.appender(self.name)
-        self.logger.info(
-            'Successfully created all component templates: %s', self.entity_list
+        logger.info(
+            'Successfully created all component templates: %s',
+            prettystr(self.entity_list),
         )
-        self.success = True

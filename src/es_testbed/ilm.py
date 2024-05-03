@@ -1,20 +1,29 @@
 """ILM Defining Class"""
 
 import typing as t
+import logging
 from os import getenv
-from time import sleep
 from dotmap import DotMap
-from .defaults import PAUSE_ENVVAR, PAUSE_DEFAULT
-from .exceptions import NameChanged, ResultNotExpected, TestbedMisconfig
-from .helpers.es_api import get_ilm_phases, ilm_explain, ilm_move, resolver
-from .helpers.utils import getlogger
+from elasticsearch8.exceptions import BadRequestError
+from es_wait import IlmPhase, IlmStep
+from es_wait.exceptions import IlmWaitError
+from es_testbed.defaults import (
+    PAUSE_ENVVAR,
+    PAUSE_DEFAULT,
+    TIMEOUT_DEFAULT,
+    TIMEOUT_ENVVAR,
+)
+from es_testbed.exceptions import NameChanged, ResultNotExpected, TestbedMisconfig
+from es_testbed.helpers.es_api import get_ilm_phases, ilm_explain, ilm_move, resolver
+from es_testbed.helpers.utils import prettystr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
 
 PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
+TIMEOUT_VALUE = float(getenv(TIMEOUT_ENVVAR, default=TIMEOUT_DEFAULT))
 
-# pylint: disable=missing-docstring
+logger = logging.getLogger('es_testbed.IlmTracker')
 
 # ## Example ILM explain output
 # {
@@ -54,7 +63,6 @@ class IlmTracker:
     """ILM Phase Tracking Class"""
 
     def __init__(self, client: 'Elasticsearch', name: str):
-        self.logger = getlogger('es_testbed.IlmTracker')
         self.client = client
         self.name = self.resolve(name)  # A single index name
         self._explain = DotMap(self.get_explain_data())
@@ -63,6 +71,7 @@ class IlmTracker:
     @property
     def current_step(self) -> t.Dict:
         """Return the current ILM step information"""
+        self.update()
         return {
             'phase': self._explain.phase,
             'action': self._explain.action,
@@ -79,7 +88,7 @@ class IlmTracker:
         """Return the next phase in the index's ILM journey"""
         retval = None
         if self._explain.phase == 'delete':
-            self.logger.warning('Already on "delete" phase. No more phases to advance')
+            logger.warning('Already on "delete" phase. No more phases to advance')
         else:
             curr = self.pnum(self._explain.phase)  # A numeric representation
             # A list of any remaining phases in the policy with a higher number than
@@ -97,6 +106,21 @@ class IlmTracker:
         """Return a list of phases in the ILM policy"""
         return list(self._phases.keys())
 
+    def _log_phase(self, phase: str) -> None:
+        logger.debug('ILM Explain Index: %s', self._explain.index)
+        logger.info('Index "%s" now on phase "%s"', self.name, phase)
+
+    def _phase_wait(
+        self, phase: str, pause: float = PAUSE_VALUE, timeout: float = TIMEOUT_VALUE
+    ) -> None:
+        """Wait until the new phase shows up in ILM Explain"""
+        kw = {'name': self.name, 'phase': phase, 'pause': pause, 'timeout': timeout}
+        phasechk = IlmPhase(self.client, **kw)
+        phasechk.wait_for_it()
+
+    def _ssphz(self, phase: str) -> bool:
+        return bool(self.pnum(phase) > self.pnum('warm'))
+
     def advance(
         self,
         phase: t.Union[str, None] = None,
@@ -104,51 +128,61 @@ class IlmTracker:
         name: t.Union[str, None] = None,
     ) -> None:
         """Advance index to next ILM phase"""
-
-        def wait(phase: str) -> None:
-            """Wait for the phase change"""
-            counter = 0
-            sleep(1.5)  # Initial wait since we set ILM to poll every second
-            while self._explain.phase != phase:
-                sleep(PAUSE_VALUE)
-                self.update()
-                counter += 1
-                self.count_logging(counter)
-
         if self._explain.phase == 'delete':
-            self.logger.warning('Already on "delete" phase. No more phases to advance')
+            logger.warning('Already on "delete" phase. No more phases to advance')
         else:
-            self.logger.debug('current_step: %s', self.current_step)
+            logger.debug('current_step: %s', prettystr(self.current_step))
             next_step = self.next_step(phase, action=action, name=name)
-            self.logger.debug('next_step: %s', next_step)
-            if next_step:
-                ilm_move(self.client, self.name, self.current_step, next_step)
-                wait(phase)
-                self.logger.info('Index %s now on phase %s', self.name, phase)
-            else:
-                self.logger.error('next_step is a None value')
-                self.logger.error('current_step: %s', self.current_step)
+            logger.debug('next_step: %s', prettystr(next_step))
+            if self._explain.phase == 'new' and phase == 'hot':
+                # It won't be for very long.
+                self._phase_wait('hot')
 
-    def count_logging(self, counter: int) -> None:
-        """Log messages based on how big counter is"""
-        # Send a message every 10 loops
-        if counter % 40 == 0:
-            self.logger.info('Still working... Explain: %s', self._explain.asdict)
-        if counter == 480:
-            msg = 'Taking too long! Giving up on waiting'
-            self.logger.critical(msg)
-            raise ResultNotExpected(msg)
+            # Regardless of the remaining phases, the current phase steps must be
+            # complete before proceeding with ilm_move
+            self.update()
+            self.wait4complete()
+            self.update()
+
+            # We could have arrived with it hot, but incomplete
+            if phase == 'hot':
+                self._log_phase(phase)
+                # we've advanced to our target phase, and all steps are completed
+
+            # Remaining phases could be warm through frozen
+            elif self._explain.phase != phase:
+
+                # We will only wait for steps to complete for the hot and warm tiers
+                wait4steps = False if self._ssphz(phase) else False
+
+                ilm_move(self.client, self.name, self.current_step, next_step)
+                self._phase_wait(phase)
+                # If cold or frozen, we can return now. We let the calling function
+                # worry about the weird name changing behavior of searchable mounts
+
+                if wait4steps:
+                    self.update()
+                    logger.debug(
+                        'Waiting for "%s" phase steps to complete...',
+                        phase,
+                    )
+                    self.wait4complete()
+                    self.update()
+                self._log_phase(phase)
+            else:
+                logger.error('next_step is a None value')
+                logger.error('current_step: %s', prettystr(self.current_step))
 
     def get_explain_data(self) -> t.Dict:
         """Get the ILM explain data and return it"""
         try:
             return ilm_explain(self.client, self.name)
         except NameChanged as err:
-            self.logger.debug('Passing along upstream exception...')
+            logger.debug('Passing along upstream exception...')
             raise NameChanged from err
         except ResultNotExpected as err:
-            msg = f'Unable to get ilm_explain API call results. Error: {err}'
-            self.logger.critical(msg)
+            msg = f'Unable to get ilm_explain results. Error: {prettystr(err)}'
+            logger.critical(msg)
             raise ResultNotExpected(msg) from err
 
     def next_step(
@@ -162,7 +196,7 @@ class IlmTracker:
         err2 = bool((action is None) and (name is not None))
         if err1 or err2:
             msg = 'If either action or name is specified, both must be'
-            self.logger.critical(msg)
+            logger.critical(msg)
             raise TestbedMisconfig(msg)
         if not phase:
             phase = self.next_phase
@@ -187,11 +221,11 @@ class IlmTracker:
         res = resolver(self.client, name)
         if len(res['aliases']) > 0 or len(res['data_streams']) > 0:
             msg = f'{name} is not an index: {res}'
-            self.logger.critical(msg)
+            logger.critical(msg)
             raise ResultNotExpected(msg)
         if len(res['indices']) > 1:
-            msg = f'{name} resolved to multiple indices: {res["indices"]}'
-            self.logger.critical(msg)
+            msg = f'{name} resolved to multiple indices: {prettystr(res["indices"])}'
+            logger.critical(msg)
             raise ResultNotExpected(msg)
         return res['indices'][0]['name']
 
@@ -200,34 +234,32 @@ class IlmTracker:
         try:
             self._explain = DotMap(self.get_explain_data())
         except NameChanged as err:
-            self.logger.debug('Passing along upstream exception...')
+            logger.debug('Passing along upstream exception...')
             raise NameChanged from err
 
     def wait4complete(self) -> None:
-        """Wait for the ILM phase change to complete both the action and step"""
-        counter = 0
-        self.logger.debug('Waiting for current action and step to complete')
-        self.logger.debug(
-            'Action: %s --- Step: %s', self._explain.action, self._explain.step
+        """Subroutine for waiting for an ILM step to complete"""
+        step_action = bool(self._explain.action == 'complete')
+        step_name = bool(self._explain.name == 'complete')
+        if bool(step_action and step_name):
+            logger.debug(
+                '%s: Current step complete: %s', self.name, prettystr(self.current_step)
+            )
+            return
+        logger.debug(
+            '%s: Current step not complete. %s', self.name, prettystr(self.current_step)
         )
-        while not bool(
-            self._explain.action == 'complete' and self._explain.step == 'complete'
-        ):
-            counter += 1
-            sleep(PAUSE_VALUE)
-            if counter % 10 == 0:
-                self.logger.debug(
-                    'Action: %s --- Step: %s', self._explain.action, self._explain.step
-                )
-            try:
-                self.count_logging(counter)
-            except ResultNotExpected as err:
-                self.logger.critical(
-                    'Breaking the loop. Explain: %s', self._explain.toDict()
-                )
-                raise ResultNotExpected from err
-            try:
-                self.update()
-            except NameChanged as err:
-                self.logger.debug('Passing along upstream exception...')
-                raise NameChanged from err
+        kw = {'name': self.name, 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
+        step = IlmStep(self.client, **kw)
+        try:
+            step.wait_for_it()
+            logger.debug('ILM Step successful. The wait is over')
+        except KeyError as exc:
+            logger.error('KeyError: The index name has changed: %s', prettystr(exc))
+            raise exc
+        except BadRequestError as exc:
+            logger.error('Index not found')
+            raise exc
+        except IlmWaitError as exc:
+            logger.error('Other IlmWait error encountered: %s', prettystr(exc))
+            raise exc

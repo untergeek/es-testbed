@@ -14,6 +14,7 @@ from es_testbed.defaults import NAMEMAPPER
 from es_testbed.helpers.es_api import get_ds_current, get_write_index
 
 LOGLEVEL = 'DEBUG'
+LOCALREPO = 'testing'
 
 
 @pytest.fixture(scope='class')
@@ -56,15 +57,33 @@ def actual_write_index(actual_rollover):
 @pytest.fixture(scope='session')
 def client():
     """Return an Elasticsearch client"""
-    host = environ.get('TEST_ES_SERVER', 'http://127.0.0.1:9200')
+    host = environ.get('TEST_ES_SERVER')
+    user = environ.get('TEST_USER')
+    pswd = environ.get('TEST_PASS')
+    cacrt = environ.get('CA_CRT')
     file = environ.get('ES_CLIENT_FILE', None)  # Path to es_client YAML config
+    repo = environ.get('TEST_ES_REPO', 'found-snapshots')
     if file:
         kwargs = {'configfile': file}
     else:
-        kwargs = {'configdict': {'elasticsearch': {'client': {'hosts': host}}}}
+        kwargs = {
+            'configdict': {
+                'elasticsearch': {
+                    'client': {'hosts': host, 'ca_certs': cacrt},
+                    'other_settings': {'username': user, 'password': pswd},
+                }
+            }
+        }
     set_logging({'loglevel': LOGLEVEL, 'blacklist': ['elastic_transport', 'urllib3']})
     builder = Builder(**kwargs)
     builder.connect()
+    if builder.client.license.get_trial_status()['eligible_to_start_trial']:
+        builder.client.license.post_start_trial(acknowledge=True)
+    # This is a contradiction that cannot exist...
+    if repo == 'found-snapshots' and host == 'https://127.0.0.1:9200' and not file:
+        # We'll make our own and set the ENV var
+        create_repository(builder.client, LOCALREPO)
+        environ['TEST_ES_REPO'] = LOCALREPO
     return builder.client
 
 
@@ -81,6 +100,20 @@ def components(namecore):
     components.append(f'{namecore("component")}-000001')
     components.append(f'{namecore("component")}-000002')
     return components
+
+
+def create_repository(client, name: str) -> None:
+    """
+    PUT _snapshot/REPO_NAME
+    {
+        "type": "fs",
+        "settings": {
+            "location": "RELATIVE_PATH"
+        }
+    }
+    """
+    repobody = {'type': 'fs', 'settings': {'location': '/media'}}
+    client.snapshot.create_repository(name=name, repository=repobody, verify=False)
 
 
 @pytest.fixture(scope='class')
@@ -273,6 +306,22 @@ def skip_no_repo(repo) -> None:
                 pytest.skip('No snapshot repository', allow_module_level=True)
 
     return _skip_no_repo
+
+
+@pytest.fixture(scope='class')
+def skip_localhost() -> None:
+    def _skip_localhost(skip_it: bool) -> None:
+        if skip_it:
+            host = environ.get('TEST_ES_SERVER')
+            file = environ.get('ES_CLIENT_FILE', None)  # Path to es_client YAML config
+            repo = environ.get('TEST_ES_REPO')
+            if repo == LOCALREPO and host == 'https://127.0.0.1:9200' and not file:
+                pytest.skip(
+                    'Local Docker test does not work with this test',
+                    allow_module_level=False,
+                )
+
+    return _skip_localhost
 
 
 @pytest.fixture(scope='class')

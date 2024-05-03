@@ -1,6 +1,7 @@
 """Functions that make Elasticsearch API Calls"""
 
 import typing as t
+import logging
 from os import getenv
 from elasticsearch8.exceptions import NotFoundError
 from es_wait import Exists, Snapshot
@@ -15,17 +16,19 @@ from ..exceptions import (
 from ..helpers.utils import (
     doc_gen,
     get_routing,
-    getlogger,
     mounted_name,
+    prettystr,
     storage_type,
 )
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
 
-LOGGER = getlogger(__name__)
 PAUSE_VALUE = float(getenv(PAUSE_ENVVAR, default=PAUSE_DEFAULT))
-# pylint: disable=broad-except,W0707
+
+logger = logging.getLogger(__name__)
+
+# pylint: disable=W0707
 
 
 def emap(kind: str, es: 'Elasticsearch', value=None) -> t.Dict[str, t.Any]:
@@ -92,7 +95,9 @@ def change_ds(client: 'Elasticsearch', actions: t.Union[str, None] = None) -> No
     try:
         client.indices.modify_data_stream(actions=actions, body=None)
     except Exception as err:
-        raise ResultNotExpected(f'Unable to modify datastreams. {err}') from err
+        raise ResultNotExpected(
+            f'Unable to modify datastreams. {prettystr(err)}'
+        ) from err
 
 
 def create_data_stream(client: 'Elasticsearch', name: str) -> None:
@@ -103,7 +108,7 @@ def create_data_stream(client: 'Elasticsearch', name: str) -> None:
         test.wait_for_it()
     except Exception as err:
         raise TestbedFailure(
-            f'Unable to create datastream {name}. Error: {err}'
+            f'Unable to create datastream {name}. Error: {prettystr(err)}'
         ) from err
 
 
@@ -165,17 +170,17 @@ def delete(
             else:
                 res = func(name=name)
         except NotFoundError as err:
-            LOGGER.warning('%s named %s not found: %s', kind, name, err)
+            logger.warning('%s named %s not found: %s', kind, name, prettystr(err))
             success = True
         except Exception as err:
-            raise ResultNotExpected(f'Unexpected result: {err}') from err
+            raise ResultNotExpected(f'Unexpected result: {prettystr(err)}') from err
         if 'acknowledged' in res and res['acknowledged']:
             success = True
-            LOGGER.info('Deleted %s: "%s"', which['plural'], name)
+            logger.info('Deleted %s: "%s"', which['plural'], name)
         else:
             success = verify(client, kind, name, repository=repository)
     else:
-        LOGGER.debug('"%s" has a None value for name', kind)
+        logger.debug('"%s" has a None value for name', kind)
     return success
 
 
@@ -184,9 +189,7 @@ def do_snap(
 ) -> None:
     """Perform a snapshot"""
     client.snapshot.create(repository=repo, snapshot=snap, indices=idx)
-    test = Snapshot(
-        client, action='snapshot', snapshot=snap, repository=repo, pause=1, timeout=60
-    )
+    test = Snapshot(client, snapshot=snap, repository=repo, pause=1, timeout=60)
     test.wait_for_it()
 
     # Mount the index accordingly
@@ -223,7 +226,7 @@ def exists(
     except NotFoundError:
         retval = False
     except Exception as err:
-        raise ResultNotExpected(f'Unexpected result: {err}') from err
+        raise ResultNotExpected(f'Unexpected result: {prettystr(err)}') from err
     return retval
 
 
@@ -286,7 +289,7 @@ def get(
     """get any/all objects of type kind matching pattern"""
     if pattern is None:
         msg = f'"{kind}" has a None value for pattern'
-        LOGGER.error(msg)
+        logger.error(msg)
         raise TestbedMisconfig(msg)
     which = emap(kind, client, value=pattern)
     func = which['get']
@@ -296,10 +299,10 @@ def get(
     try:
         result = func(**kwargs)
     except NotFoundError:
-        LOGGER.debug('%s pattern "%s" had zero matches', kind, pattern)
+        logger.debug('%s pattern "%s" had zero matches', kind, pattern)
         return []
     except Exception as err:
-        raise ResultNotExpected(f'Unexpected result: {err}') from err
+        raise ResultNotExpected(f'Unexpected result: {prettystr(err)}') from err
     if kind == 'snapshot':
         retval = [x['snapshot'] for x in result['snapshots']]
     elif kind in ['data_stream', 'template', 'component']:
@@ -351,8 +354,8 @@ def get_ilm(client: 'Elasticsearch', pattern: str) -> t.Union[t.Dict[str, str], 
     try:
         return client.ilm.get_lifecycle(name=pattern)
     except Exception as err:
-        msg = f'Unable to get ILM lifecycle matching {pattern}. Error: {err}'
-        LOGGER.critical(msg)
+        msg = f'Unable to get ILM lifecycle matching {pattern}. Error: {prettystr(err)}'
+        logger.critical(msg)
         raise ResultNotExpected(msg) from err
 
 
@@ -362,8 +365,8 @@ def get_ilm_phases(client: 'Elasticsearch', name: str) -> t.Dict:
     try:
         return ilm[name]['policy']['phases']
     except KeyError as err:
-        msg = f'Unable to get ILM lifecycle named {name}. Error: {err}'
-        LOGGER.critical(msg)
+        msg = f'Unable to get ILM lifecycle named {name}. Error: {prettystr(err)}'
+        logger.critical(msg)
         raise ResultNotExpected(msg) from err
 
 
@@ -391,34 +394,21 @@ def get_write_index(client: 'Elasticsearch', name: str) -> str:
     return retval
 
 
-def snapshot_name(client: 'Elasticsearch', name: str) -> t.Union[t.AnyStr, None]:
-    """Get the name of the snapshot behind the mounted index data"""
-    res = {}
-    if exists(client, 'index', name):  # Can jump straight to nested keys if it exists
-        res = client.indices.get(index=name)[name]['settings']['index']
-    try:
-        retval = res['store']['snapshot']['snapshot_name']
-    except KeyError:
-        LOGGER.error('%s is not a searchable snapshot')
-        retval = None
-    return retval
-
-
 def ilm_explain(client: 'Elasticsearch', name: str) -> t.Union[t.Dict, None]:
     """Return the results from the ILM Explain API call for the named index"""
     try:
         retval = client.ilm.explain_lifecycle(index=name)['indices'][name]
     except KeyError:
-        LOGGER.debug('Index name changed')
+        logger.debug('Index name changed')
         new = list(client.ilm.explain_lifecycle(index=name)['indices'].keys())[0]
         retval = client.ilm.explain_lifecycle(index=new)['indices'][new]
     except NotFoundError as err:
-        LOGGER.warning('Datastream/Index Name changed. %s was not found', name)
+        logger.warning('Datastream/Index Name changed. %s was not found', name)
         raise NameChanged(f'{name} was not found, likely due to a name change') from err
     except Exception as err:
         msg = f'Unable to get ILM information for index {name}'
-        LOGGER.critical(msg)
-        raise ResultNotExpected(f'{msg}. Exception: {err}') from err
+        logger.critical(msg)
+        raise ResultNotExpected(f'{msg}. Exception: {prettystr(err)}') from err
     return retval
 
 
@@ -431,8 +421,11 @@ def ilm_move(
             index=name, current_step=current_step, next_step=next_step
         )
     except Exception as err:
-        msg = f'Unable to move index {name} to ILM next step: {next}. Error: {err}'
-        LOGGER.critical(msg)
+        msg = (
+            f'Unable to move index {name} to ILM next step: {next_step}. '
+            f'Error: {prettystr(err)}'
+        )
+        logger.critical(msg)
         raise ResultNotExpected(msg, err)
 
 
@@ -446,7 +439,7 @@ def put_comp_tmpl(client: 'Elasticsearch', name: str, component: t.Dict) -> None
         test.wait_for_it()
     except Exception as err:
         raise TestbedFailure(
-            f'Unable to create component template {name}. Error: {err}'
+            f'Unable to create component template {name}. Error: {prettystr(err)}'
         ) from err
 
 
@@ -470,7 +463,7 @@ def put_idx_tmpl(
         test.wait_for_it()
     except Exception as err:
         raise TestbedFailure(
-            f'Unable to create index template {name}. Error: {err}'
+            f'Unable to create index template {name}. Error: {prettystr(err)}'
         ) from err
 
 
@@ -482,7 +475,7 @@ def put_ilm(
         client.ilm.put_lifecycle(name=name, policy=policy)
     except Exception as err:
         raise TestbedFailure(
-            f'Unable to put index lifecycle policy {name}. Error: {err}'
+            f'Unable to put index lifecycle policy {name}. Error: {prettystr(err)}'
         ) from err
 
 
@@ -504,3 +497,16 @@ def resolver(client: 'Elasticsearch', name: str) -> dict:
 def rollover(client: 'Elasticsearch', name: str) -> None:
     """Rollover alias or datastream identified by name"""
     client.indices.rollover(alias=name, wait_for_active_shards='all')
+
+
+def snapshot_name(client: 'Elasticsearch', name: str) -> t.Union[t.AnyStr, None]:
+    """Get the name of the snapshot behind the mounted index data"""
+    res = {}
+    if exists(client, 'index', name):  # Can jump straight to nested keys if it exists
+        res = client.indices.get(index=name)[name]['settings']['index']
+    try:
+        retval = res['store']['snapshot']['snapshot_name']
+    except KeyError:
+        logger.error('%s is not a searchable snapshot')
+        retval = None
+    return retval

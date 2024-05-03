@@ -2,8 +2,6 @@
 
 import typing as t
 
-# pylint: disable=missing-function-docstring
-
 EPILOG: str = 'Learn more at https://github.com/untergeek/es-testbed'
 
 HELP_OPTIONS: dict = {'help_option_names': ['-h', '--help']}
@@ -92,22 +90,27 @@ IlmPhase: t.TypeAlias = t.Dict[
 
 
 def ilmhot() -> IlmPhase:
+    """Return a default hot ILM phase"""
     return {'actions': {'rollover': {'max_primary_shard_size': '1gb', 'max_age': '1d'}}}
 
 
 def ilmwarm() -> IlmPhase:
+    """Return a default warm ILM phase"""
     return {'min_age': '2d', 'actions': {}}
 
 
 def ilmcold() -> IlmPhase:
+    """Return a default cold ILM phase"""
     return {'min_age': '3d', 'actions': {}}
 
 
 def ilmfrozen() -> IlmPhase:
+    """Return a default frozen ILM phase"""
     return {'min_age': '4d', 'actions': {}}
 
 
 def ilmdelete() -> IlmPhase:
+    """Return a default delete ILM phase"""
     return {'min_age': '5d', 'actions': {'delete': {}}}
 
 

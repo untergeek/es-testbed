@@ -1,6 +1,7 @@
 """Utility helper functions"""
 
 import typing as t
+from pprint import pformat
 import random
 import string
 import logging
@@ -8,18 +9,22 @@ from datetime import datetime, timezone
 from ..defaults import ilm_force_merge, ilm_phase, MAPPING, TIER
 from ..exceptions import TestbedMisconfig
 
+logger = logging.getLogger(__name__)
+
 
 def build_ilm_phase(
     tier: str,
     actions: t.Union[t.Dict, None] = None,
-    repository: t.Union[str, None] = None,
+    repo: t.Union[str, None] = None,
+    fm: bool = False,
 ) -> t.Dict:
     """Build a single ILM policy step based on tier"""
     phase = ilm_phase(tier)
     if tier in ['cold', 'frozen']:
-        if repository:
+        if repo:
             phase[tier]['actions']['searchable_snapshot'] = {
-                'snapshot_repository': repository
+                'snapshot_repository': repo,
+                'force_merge_index': fm,
             }
         else:
             msg = (
@@ -48,7 +53,8 @@ def build_ilm_policy(
     if ('cold' in tiers or 'frozen' in tiers) and not repository:
         raise TestbedMisconfig('Cannot build cold or frozen phase without repository')
     for tier in tiers:
-        phases.update(build_ilm_phase(tier, repository=repository))
+        phase = build_ilm_phase(tier, repo=repository, fm=forcemerge)
+        phases.update(phase)
     if forcemerge:
         phases['hot']['actions'].update(
             ilm_force_merge(max_num_segments=max_num_segments)
@@ -142,6 +148,32 @@ def mapping_component() -> t.Dict:
 def mounted_name(index: str, tier: str):
     """Return a value for renamed_index for mounting a searchable snapshot index"""
     return f'{TIER[tier]["prefix"]}-{index}'
+
+
+def prettystr(*args, **kwargs) -> str:
+    """
+    A (nearly) straight up wrapper for pprint.pformat, except that we provide our own
+    default values for 'indent' (2) and 'sort_dicts' (False). Primarily for debug
+    logging and showing more readable dictionaries.
+
+    'Return the formatted representation of object as a string. indent, width, depth,
+    compact, sort_dicts and underscore_numbers are passed to the PrettyPrinter
+    constructor as formatting parameters' (from pprint documentation).
+    """
+    defaults = [
+        ('indent', 2),
+        ('width', 80),
+        ('depth', None),
+        ('compact', False),
+        ('sort_dicts', False),
+        ('underscore_numbers', False),
+    ]
+    kw = {}
+    for tup in defaults:
+        key, default = tup
+        kw[key] = kwargs[key] if key in kwargs else default
+
+    return f"\n{pformat(*args, **kw)}"  # newline in front so it always starts clean
 
 
 def randomstr(length: int = 16, lowercase: bool = False) -> str:

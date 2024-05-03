@@ -1,14 +1,16 @@
 """TestPlan Class Definition"""
 
 import typing as t
+import logging
 from dotmap import DotMap
-from .defaults import TESTPLAN
-from .helpers.utils import build_ilm_policy, getlogger, randomstr
+from es_testbed.defaults import TESTPLAN
+from es_testbed.helpers.utils import build_ilm_policy, prettystr, randomstr
 
-# pylint: disable=missing-docstring
+logger = logging.getLogger('es_testbed.PlanBuilder')
 
 
 class PlanBuilder:
+    """Plan builder class"""
 
     def __init__(
         self,
@@ -16,12 +18,12 @@ class PlanBuilder:
         default_entities: bool = True,
         autobuild: t.Optional[bool] = True,
     ):
-        self.logger = getlogger('es_testbed.PlanBuilder')
         self.default_entities = default_entities
         if settings is None:
-            settings = TESTPLAN
+            raise ValueError('Must provide a settings dictionary')
         self.settings = settings
         self._plan = DotMap(TESTPLAN)
+        logger.debug('INITIAL PLAN: %s', prettystr(self._plan))
         self._plan.cleanup = 'UNKNOWN'  # Future use?
         if autobuild:
             self.setup()
@@ -78,6 +80,7 @@ class PlanBuilder:
 
     @property
     def plan(self) -> DotMap:
+        """Return the Plan"""
         return self._plan
 
     def _create_lists(self) -> None:
@@ -98,12 +101,14 @@ class PlanBuilder:
         match: t.Optional[bool] = True,
         searchable: t.Optional[str] = None,
     ) -> None:
-        entity = {'docs': docs, 'match': match}
+        """Add an index or data_stream"""
+        entity = DotMap({'docs': docs, 'match': match})
         if searchable:
-            entity['searchable'] = searchable
+            entity.searchable = searchable
         self._plan.entities.append(entity)
 
     def make_default_entities(self) -> None:
+        """Loop through until all entities are created"""
         defs = TESTPLAN['defaults']  # Start with defaults
         if 'defaults' in self._plan:
             defs = self._plan.defaults
@@ -112,30 +117,33 @@ class PlanBuilder:
             'match': defs['match'],
             'searchable': defs['searchable'],
         }
+        self._plan.entities = []
         for _ in range(0, defs['entity_count']):
             self.add_entity(**kwargs)
-        self.logger.debug(
-            'Plan will create %s (backing) indices', len(self._plan.entities)
-        )
+        logger.debug('Plan will create %s (backing) indices', len(self._plan.entities))
 
     def setup(self) -> None:
+        """Do initial setup of the Plan DotMap"""
         self._plan.uniq = randomstr(length=8, lowercase=True)
         self._create_lists()
         self.update(self.settings)  # Override with settings.
         self.update_rollover_alias()
+        logger.debug('Rollover alias updated')
         self.update_ilm()
         if not self._plan.entities:
             if self.default_entities:
                 self.make_default_entities()
-        self.logger.debug('Test Plan: %s', self._plan.pprint())
+        logger.debug('Test Plan: %s', prettystr(self._plan.toDict()))
 
     def update(self, settings: t.Dict) -> None:
+        """Update the Plan DotMap"""
         self._plan.update(**settings)
 
     def update_ilm(self) -> None:
+        """Update the ILM portion of the Plan DotMap"""
         setdefault = False
         if 'ilm' not in self._plan:
-            self.logger.debug('key "ilm" is not in plan')
+            logger.debug('key "ilm" is not in plan')
             setdefault = True
         if isinstance(self._plan.ilm, dict):
             _ = DotMap(self._plan.ilm)
@@ -143,34 +151,39 @@ class PlanBuilder:
         if isinstance(self._plan.ilm, DotMap):
             if 'enabled' not in self._plan.ilm:
                 # Override with defaults
-                self.logger.debug(
+                logger.debug(
                     'plan.ilm does not have key "enabled". Overriding with defaults'
                 )
                 setdefault = True
         elif isinstance(self._plan.ilm, bool):
             if self._plan.ilm:
-                self.logger.warning(
+                logger.warning(
                     '"plan.ilm: True" is incorrect. Use plan.ilm.enabled: True'
                 )
-            self.logger.debug('plan.ilm is boolean. Overriding with defaults')
+            logger.debug('plan.ilm is boolean. Overriding with defaults')
             setdefault = True
         if setdefault:
-            self.logger.debug('Setting defaults for ILM')
+            logger.debug('Setting defaults for ILM')
             self._plan.ilm = DotMap(TESTPLAN['ilm'])
-        ilm = self._plan.ilm
-        for entity in self._plan.entities:
-            if 'searchable' in entity and entity['searchable'] is not None:
-                if not entity['searchable'] in ilm.tiers:
-                    ilm.tiers.append(entity['searchable'])
-        kwargs = {
-            'tiers': ilm.tiers,
-            'forcemerge': ilm.forcemerge,
-            'max_num_segments': ilm.max_num_segments,
-            'repository': self._plan.repository,
-        }
-        self._plan.ilm.policy = build_ilm_policy(**kwargs)
+        if self._plan.ilm.enabled:
+            ilm = self._plan.ilm
+            if not isinstance(self._plan.ilm.tiers, list):
+                logger.error('Tiers is not a list!')
+                self._plan.ilm.tiers = TESTPLAN['ilm']['tiers']
+            for entity in self._plan.entities:
+                if 'searchable' in entity and entity['searchable'] is not None:
+                    if not entity['searchable'] in ilm.tiers:
+                        ilm.tiers.append(entity['searchable'])
+            kwargs = {
+                'tiers': ilm.tiers,
+                'forcemerge': ilm.forcemerge,
+                'max_num_segments': ilm.max_num_segments,
+                'repository': self._plan.repository,
+            }
+            self._plan.ilm.policy = build_ilm_policy(**kwargs)
 
     def update_rollover_alias(self) -> None:
+        """Update the Rollover Alias value"""
         if self._plan.rollover_alias:
             self._plan.rollover_alias = f'{self._plan.prefix}-idx-{self._plan.uniq}'
         else:

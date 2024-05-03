@@ -1,19 +1,22 @@
 """ILM Policy Entity Manager Class"""
 
 import typing as t
-from .entitymgr import EntityMgr
-from ..exceptions import ResultNotExpected
-from ..helpers.es_api import exists, put_ilm
-from ..helpers.utils import build_ilm_policy, getlogger
+import logging
+from es_testbed.exceptions import ResultNotExpected
+from es_testbed.helpers.es_api import exists, put_ilm
+from es_testbed.helpers.utils import build_ilm_policy
+from es_testbed.mgrs.entity import EntityMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
     from dotmap import DotMap
 
-# pylint: disable=missing-docstring
+logger = logging.getLogger(__name__)
 
 
 class IlmMgr(EntityMgr):
+    """Index Lifecycle Policy Entity Manager"""
+
     kind = 'ilm'
     listname = 'ilm_policies'
 
@@ -21,10 +24,8 @@ class IlmMgr(EntityMgr):
         self,
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
-        autobuild: t.Optional[bool] = True,
     ):
-        self.logger = getlogger('es_testbed.IlmMgr')
-        super().__init__(client=client, plan=plan, autobuild=autobuild)
+        super().__init__(client=client, plan=plan)
 
     def get_policy(self) -> t.Dict:
         """Return the configured ILM policy"""
@@ -39,6 +40,7 @@ class IlmMgr(EntityMgr):
 
     def setup(self) -> None:
         """Setup the entity manager"""
+        logger.debug('Starting IlmMgr setup...')
         if self.plan.ilm.enabled:
             self.plan.ilm.policy = self.get_policy()
             put_ilm(self.client, self.name, policy=self.plan.ilm.policy)
@@ -49,8 +51,8 @@ class IlmMgr(EntityMgr):
                 )
             # This goes first because the length of entity_list determines the suffix
             self.appender(self.name)
-            self.logger.info('Successfully created ILM policy: %s', self.last)
+            logger.info('Successfully created ILM policy: %s', self.last)
+            logger.debug(self.client.ilm.get_lifecycle(name=self.last))
         else:
             self.appender(None)  # This covers self.plan.ilm_policies[-1]
-            self.logger.info('No ILM policy created.')
-        self.success = True
+            logger.info('No ILM policy created.')
