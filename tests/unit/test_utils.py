@@ -32,9 +32,16 @@ TREPO: t.Dict[str, t.Union[str, None]] = {
 }
 
 
-def searchable(repo: str = None) -> t.Union[t.Dict[str, t.Dict[str, str]], None]:
+def searchable(
+    repo: str = None, fm: bool = None
+) -> t.Union[t.Dict[str, t.Dict[str, str]], None]:
     if repo:
-        return {'searchable_snapshot': {'snapshot_repository': repo}}
+        return {
+            'searchable_snapshot': {
+                'snapshot_repository': repo,
+                'force_merge_index': fm,
+            }
+        }
     return {}
 
 
@@ -50,8 +57,9 @@ def forcemerge(
 def tiertestval():
     def _tiertestval(tier: str, repo: str = None, fm: bool = False, mns: int = 1):
         retval = {tier: FMAP[tier]}
-        retval[tier]['actions'].update(searchable(repo))
-        retval[tier]['actions'].update(forcemerge(fm=fm, mns=mns))
+        retval[tier]['actions'].update(searchable(repo=repo, fm=fm))
+        kwargs = {'fm': fm, 'mns': mns} if tier in ['hot', 'warm'] else {}
+        retval[tier]['actions'].update(forcemerge(**kwargs))
         return retval
 
     return _tiertestval
@@ -60,9 +68,7 @@ def tiertestval():
 @pytest.fixture
 def builtphase():
     def _builtphase(tier: str, repo: str = None, fm: bool = False, mns: int = 1):
-        return build_ilm_phase(
-            tier, actions=forcemerge(fm=fm, mns=mns), repository=repo
-        )
+        return build_ilm_phase(tier, actions=forcemerge(fm=fm, mns=mns), repo=repo)
 
     return _builtphase
 
@@ -98,8 +104,9 @@ def test_build_ilm_policy(tiertestval):
         phases = {}  # Build out the phase dict for each scenario
         fm, mns = fmerge[idx]  # Extract whether to use forcemerge by index/tuple
         for tier in tgrp:  # Iterate over each tier in the testing scenario
+            kwargs = {'fm': fm} if tier in ['cold', 'frozen'] else {}
             phases.update(
-                tiertestval(tier, repo=TREPO[tier])
+                tiertestval(tier, repo=TREPO[tier], **kwargs)
             )  # Update with values per tier
         if fm:  # If we're doing forcemerge
             phases['hot']['actions'].update(

@@ -1,16 +1,16 @@
 """Entity Class Definition"""
 
 import typing as t
-from ..defaults import NAMEMAPPER
+from es_testbed.defaults import NAMEMAPPER
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
     from dotmap import DotMap
 
-# pylint: disable=missing-docstring,broad-exception-caught,too-many-instance-attributes
-
 
 class EntityMgr:
+    """Entity Manager Parent Class"""
+
     kind = 'entity_type'
     listname = 'entity_mgrs'
 
@@ -18,13 +18,9 @@ class EntityMgr:
         self,
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
-        autobuild: t.Optional[bool] = True,
     ):
         self.client = client
         self.plan = plan
-        self.success = False
-        if autobuild:
-            self.setup()
 
     @property
     def entity_list(self) -> t.List:

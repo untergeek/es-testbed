@@ -12,7 +12,12 @@ plan = {
     'type': 'indices',
     'prefix': 'es-testbed',
     'uniq': 'mytest',
-    'ilm': False,
+    'ilm': {
+        'enabled': False,
+        'tiers': ['hot', 'delete'],
+        'forcemerge': False,
+        'max_num_segments': 1,
+    },
     'defaults': {
         'entity_count': 3,
         'docs': 10,
@@ -23,6 +28,8 @@ plan = {
 
 tp = TestPlan(settings=plan)
 ```
+
+**Note:** If ``ilm['enabled'] == False``, the other subkeys will be ignored. In fact, ``ilm: False`` is also acceptable.
 
 Save this for step 2.
 

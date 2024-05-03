@@ -1,6 +1,5 @@
 """Integration Test Setup"""
 
-import logging
 import pytest
 from es_testbed import PlanBuilder, TestBed
 
@@ -22,12 +21,22 @@ class TestAny:
         'forcemerge': False,
         'max_num_segments': 1,
     }
-    logger = logging.getLogger(__name__)
 
     @pytest.fixture(scope="class")
-    def tb(self, client, settings, skip_no_repo):
+    def tb(self, client, settings, skip_no_repo, skip_localhost):
         """TestBed setup/teardown"""
         skip_no_repo(self.repo_test)
+        skip_localhost(
+            bool(
+                self.sstier in ['frozen']
+                and self.ilm['enabled'] is True
+                and (
+                    self.kind == 'data_stream'
+                    or (self.kind == 'indices' and self.roll is True)
+                )
+            )
+        )
+        skip_localhost(False)
         cfg = settings(
             plan_type=self.kind,
             rollover_alias=self.roll,
@@ -71,10 +80,7 @@ class TestAny:
         Will still return True if not a rollover or data_stream enabled test
         """
         expected = write_index_name(plan=tb.plan, tier=self.sstier)
-        self.logger.debug('PLAN: %s', tb.plan)
-        self.logger.debug('expected: %s', expected)
         actual = actual_write_index(tb)
-        self.logger.debug('actual: %s', actual)
         assert actual == expected
 
     def test_index_template(self, tb, components, get_template, template):

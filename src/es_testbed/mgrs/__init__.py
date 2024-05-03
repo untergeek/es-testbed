@@ -1,11 +1,11 @@
 """Make class import nicer"""
 
-from .componentmgr import ComponentMgr
-from .data_streammgr import DataStreamMgr
-from .ilmmgr import IlmMgr
-from .indexmgr import IndexMgr
-from .snapshotmgr import SnapshotMgr
-from .templatemgr import TemplateMgr
+from es_testbed.mgrs.component import ComponentMgr
+from es_testbed.mgrs.data_stream import DataStreamMgr
+from es_testbed.mgrs.ilm import IlmMgr
+from es_testbed.mgrs.index import IndexMgr
+from es_testbed.mgrs.snapshot import SnapshotMgr
+from es_testbed.mgrs.template import TemplateMgr
 
 __all__ = [
     'ComponentMgr',

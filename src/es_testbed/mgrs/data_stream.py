@@ -1,20 +1,23 @@
 """data_stream Entity Manager Class"""
 
 import typing as t
-from .indexmgr import IndexMgr
-from .snapshotmgr import SnapshotMgr
-from ..entities import DataStream, Index
-from ..helpers.es_api import create_data_stream
-from ..helpers.utils import getlogger
+import logging
+from es_testbed.entities import DataStream, Index
+from es_testbed.helpers.es_api import create_data_stream
+from es_testbed.helpers.utils import prettystr
+from es_testbed.mgrs.index import IndexMgr
+from es_testbed.mgrs.snapshot import SnapshotMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
     from dotmap import DotMap
 
-# pylint: disable=missing-docstring,too-many-arguments,broad-exception-caught
+logger = logging.getLogger(__name__)
 
 
 class DataStreamMgr(IndexMgr):
+    """data_stream Entity Manager Class"""
+
     kind = 'data_stream'
     listname = 'data_stream'
 
@@ -22,13 +25,11 @@ class DataStreamMgr(IndexMgr):
         self,
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
-        autobuild: t.Optional[bool] = True,
         snapmgr: t.Union[SnapshotMgr, None] = None,
     ):
         self.ds = None
         self.index_trackers = []
-        self.logger = getlogger('es_testbed.DataStreamMgr')
-        super().__init__(client=client, plan=plan, autobuild=autobuild, snapmgr=snapmgr)
+        super().__init__(client=client, plan=plan, snapmgr=snapmgr)
 
     @property
     def suffix(self):
@@ -49,8 +50,10 @@ class DataStreamMgr(IndexMgr):
         """If the indices were marked as searchable snapshots, we do that now"""
         for idx, scheme in enumerate(self.plan.entities):
             self.index_trackers[idx].mount_ss(scheme)
-        self.logger.info('Completed backing index promotion to searchable snapshots.')
-        self.logger.info('data_stream backing indices: %s', self.ds.backing_indices)
+        logger.info('Completed backing index promotion to searchable snapshots.')
+        logger.info(
+            'data_stream backing indices: %s', prettystr(self.ds.backing_indices)
+        )
 
     def setup(self) -> None:
         """Setup the entity manager"""
@@ -61,31 +64,32 @@ class DataStreamMgr(IndexMgr):
             else:
                 self.ds.rollover()
             self.filler(scheme)
-        self.logger.debug('Created data_stream: %s', self.ds.name)
-        self.logger.debug(
-            'Created data_stream backing indices: %s', self.ds.backing_indices
+        logger.debug('Created data_stream: %s', self.ds.name)
+        logger.debug(
+            'Created data_stream backing indices: %s',
+            prettystr(self.ds.backing_indices),
         )
         for index in self.ds.backing_indices:
             self.track_index(index)
         self.ds.verify(self.indexlist)
         self.searchable()
         self.ds.verify(self.indexlist)
-        self.logger.info('Successfully completed data_stream buildout.')
-        self.success = True
+        logger.info('Successfully completed data_stream buildout.')
 
     def track_data_stream(self) -> None:
         """Add a DataStream entity and append it to entity_list"""
-        self.logger.debug('Tracking data_stream: %s', self.name)
+        logger.debug('Tracking data_stream: %s', self.name)
         self.ds = DataStream(client=self.client, name=self.name)
         self.appender(self.name)
 
     def track_index(self, name: str) -> None:
         """Add an Index entity and append it to index_trackers"""
-        self.logger.debug('Tracking index: %s', name)
+        logger.debug('Tracking index: "%s"', name)
         entity = Index(
             client=self.client,
             name=name,
             snapmgr=self.snapmgr,
             policy_name=self.policy_name,
         )
+        entity.track_ilm(name)
         self.index_trackers.append(entity)

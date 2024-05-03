@@ -1,16 +1,16 @@
 """Index Template Entity Manager Class"""
 
 import typing as t
-from .entitymgr import EntityMgr
-from ..exceptions import ResultNotExpected
-from ..helpers.es_api import exists, put_idx_tmpl
-from ..helpers.utils import getlogger
+import logging
+from es_testbed.exceptions import ResultNotExpected
+from es_testbed.helpers.es_api import exists, put_idx_tmpl
+from es_testbed.mgrs.entity import EntityMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
     from dotmap import DotMap
 
-# pylint: disable=missing-docstring,too-many-arguments
+logger = logging.getLogger(__name__)
 
 
 class TemplateMgr(EntityMgr):
@@ -23,10 +23,8 @@ class TemplateMgr(EntityMgr):
         self,
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
-        autobuild: t.Optional[bool] = True,
     ):
-        self.logger = getlogger('es_testbed.TemplateMgr')
-        super().__init__(client=client, plan=plan, autobuild=autobuild)
+        super().__init__(client=client, plan=plan)
 
     @property
     def patterns(self) -> t.Sequence[str]:
@@ -55,5 +53,4 @@ class TemplateMgr(EntityMgr):
                 f'Unable to verify creation of index template {self.name}'
             )
         self.appender(self.name)
-        self.logger.info('Successfully created index template: %s', self.last)
-        self.success = True
+        logger.info('Successfully created index template: %s', self.last)

@@ -1,21 +1,23 @@
 """Index Entity Manager Class"""
 
 import typing as t
-from .entitymgr import EntityMgr
-from .snapshotmgr import SnapshotMgr
-from ..entities import Alias, Index
-from ..helpers.es_api import create_index, fill_index
-from ..helpers.utils import getlogger, setting_component
-
+import logging
+from es_testbed.entities import Alias, Index
+from es_testbed.helpers.es_api import create_index, fill_index
+from es_testbed.helpers.utils import prettystr, setting_component
+from es_testbed.mgrs.entity import EntityMgr
+from es_testbed.mgrs.snapshot import SnapshotMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
     from dotmap import DotMap
 
-# pylint: disable=missing-docstring
+logger = logging.getLogger(__name__)
 
 
 class IndexMgr(EntityMgr):
+    """Index Entity Manager Class"""
+
     kind = 'index'
     listname = 'indices'
 
@@ -23,14 +25,12 @@ class IndexMgr(EntityMgr):
         self,
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
-        autobuild: t.Optional[bool] = True,
         snapmgr: t.Union[SnapshotMgr, None] = None,
     ):
         self.doc_incr = 0
         self.snapmgr = snapmgr
         self.alias = None  # Only used for tracking the rollover alias
-        self.logger = getlogger('es_testbed.IndexMgr')
-        super().__init__(client=client, plan=plan, autobuild=autobuild)
+        super().__init__(client=client, plan=plan)
 
     @property
     def indexlist(self) -> t.Sequence[str]:
@@ -53,25 +53,24 @@ class IndexMgr(EntityMgr):
             }
             cfg = setting_component(**kw)['settings']
             acfg = {self.plan.rollover_alias: {'is_write_index': True}}
-            self.logger.debug(
+            logger.debug(
                 'No indices created yet. Starting with a rollover alias index...'
             )
             create_index(self.client, self.name, aliases=acfg, settings=cfg)
-            self.logger.debug(
+            logger.debug(
                 'Created %s with rollover alias %s', self.name, self.plan.rollover_alias
             )
             self.track_alias()
         else:
             self.alias.rollover()
             if self.policy_name:  # We have an ILM policy
-                self.logger.debug('Going to wait now...')
-                self.last.ilm_tracker.wait4complete()
-                self.logger.debug('The wait is over!')
+                kw = {'phase': 'hot', 'action': 'complete', 'name': 'complete'}
+                self.last.ilm_tracker.advance(**kw)
 
     def add(self, value) -> None:
         """Create a single index"""
         # In this case, value is a single array element from plan.entities
-        self.logger.debug('Creating index: %s', value)
+        logger.debug('Creating index: "%s"', value)
         create_index(self.client, value)
 
     def add_indices(self) -> None:
@@ -83,17 +82,18 @@ class IndexMgr(EntityMgr):
                 self.add(self.name)
             self.filler(scheme)
             self.track_index(self.name)
-        self.logger.debug('Created indices: %s', self.indexlist)
+        logger.debug('Created indices: %s', prettystr(self.indexlist))
         if self.plan.rollover_alias:
             if not self.alias.verify(self.indexlist):
-                self.logger.error(
-                    'Unable to confirm rollover of alias "%s" was successfully executed'
+                logger.error(
+                    'Unable to confirm rollover of alias "%s" was successful',
+                    self.plan.rollover_alias,
                 )
 
     def filler(self, scheme) -> None:
         """If the scheme from the TestPlan says to write docs, do it"""
         # scheme is a single array element from plan.entities
-        self.logger.debug('Adding docs to %s', self.name)
+        logger.debug('Adding docs to "%s"', self.name)
         if scheme['docs'] > 0:
             fill_index(
                 self.client,
@@ -111,26 +111,27 @@ class IndexMgr(EntityMgr):
 
     def setup(self) -> None:
         """Setup the entity manager"""
-        self.logger.debug('Beginning setup...')
+        logger.debug('Beginning setup...')
+        logger.debug('PLAN: %s', prettystr(self.plan.toDict()))
         if self.plan.rollover_alias:
-            self.logger.debug('rollover_alias is True...')
+            logger.debug('rollover_alias is True...')
         self.add_indices()
         self.searchable()
-        self.logger.info('Successfully created indices: %s', self.indexlist)
-        self.success = True
+        logger.info('Successfully created indices: %s', prettystr(self.indexlist))
 
     def track_alias(self) -> None:
         """Track a rollover alias"""
-        self.logger.debug('Tracking alias: %s', self.plan.rollover_alias)
+        logger.debug('Tracking alias: %s', self.plan.rollover_alias)
         self.alias = Alias(client=self.client, name=self.plan.rollover_alias)
 
     def track_index(self, name: str) -> None:
         """Track an index and append that tracking entity to entity_list"""
-        self.logger.debug('Tracking index: %s', name)
+        logger.debug('Tracking index: %s', name)
         entity = Index(
             client=self.client,
             name=name,
             snapmgr=self.snapmgr,
             policy_name=self.policy_name,
         )
+        entity.track_ilm(self.name)
         self.entity_list.append(entity)

@@ -1,13 +1,15 @@
 """Alias Entity Class"""
 
 import typing as t
-from .entity import Entity
-from ..helpers.es_api import resolver, rollover
-from ..helpers.utils import getlogger
-
+import logging
+from es_testbed.entities.entity import Entity
+from es_testbed.helpers.es_api import resolver, rollover
+from es_testbed.helpers.utils import prettystr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
+
+logger = logging.getLogger(__name__)
 
 # pylint: disable=missing-docstring,too-many-arguments
 
@@ -19,7 +21,6 @@ class Alias(Entity):
         client: 'Elasticsearch',
         name: t.Union[str, None] = None,
     ):
-        self.logger = getlogger('es_testbed.Alias')
         super().__init__(client=client, name=name)
 
     def rollover(self) -> None:
@@ -30,13 +31,15 @@ class Alias(Entity):
         res = resolver(self.client, self.name)
         for idx, alias in enumerate(res['aliases']):
             if alias['name'] == self.name:
-                self.logger.debug('Confirm match of alias %s at index %s', alias, idx)
+                logger.debug(
+                    'Confirm list index position [%s] match of alias %s',
+                    idx,
+                    prettystr(alias),
+                )
             else:
                 continue
             if alias['indices'] == index_list:
-                self.logger.debug(
-                    'Confirm match of indices backed by alias %s', self.name
-                )
+                logger.debug('Confirm match of indices backed by alias %s', self.name)
                 retval = True
                 break
         return retval
