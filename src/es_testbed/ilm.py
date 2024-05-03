@@ -116,7 +116,7 @@ class IlmTracker:
         """Wait until the new phase shows up in ILM Explain"""
         kw = {'name': self.name, 'phase': phase, 'pause': pause, 'timeout': timeout}
         phasechk = IlmPhase(self.client, **kw)
-        phasechk.wait_for_it()
+        phasechk.wait()
 
     def _ssphz(self, phase: str) -> bool:
         return bool(self.pnum(phase) > self.pnum('warm'))
@@ -252,7 +252,7 @@ class IlmTracker:
         kw = {'name': self.name, 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
         step = IlmStep(self.client, **kw)
         try:
-            step.wait_for_it()
+            step.wait()
             logger.debug('ILM Step successful. The wait is over')
         except KeyError as exc:
             logger.error('KeyError: The index name has changed: %s', prettystr(exc))

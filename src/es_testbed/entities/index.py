@@ -85,7 +85,7 @@ class Index(Entity):
             self.client, pause=PAUSE_VALUE, timeout=TIMEOUT_VALUE, name=self.name
         )
         try:
-            step.wait_for_it()
+            step.wait()
             logger.debug('ILM Step successful. The wait is over')
         except KeyError as exc:
             logger.error('KeyError: The index name has changed: "%s"', exc)
@@ -114,7 +114,7 @@ class Index(Entity):
             'timeout': TIMEOUT_VALUE,
         }
         test = Exists(self.client, **kwargs)
-        test.wait_for_it()
+        test.wait()
 
         # Update the name and run
         logger.debug('Updating self.name from "%s" to "%s"...', self.name, newidx)
@@ -151,7 +151,7 @@ class Index(Entity):
     #             'timeout': TIMEOUT_VALUE,
     #         }
     #         test = Exists(self.client, **kwargs)
-    #         test.wait_for_it()
+    #         test.wait()
     #         logger.info('ILM advance to phase %s completed', target)
     #         self.name = newidx
     #         self.track_ilm(self.name)  # Refresh the ilm_tracker with the new name
@@ -197,7 +197,7 @@ class Index(Entity):
                 name=self.name,
                 phase=self.ilm_tracker.next_phase,
             )
-            phasenext.wait_for_it()
+            phasenext.wait()
         target = self._get_target
         if current != target:
             logger.debug('Current (%s) and target (%s) mismatch', current, target)
