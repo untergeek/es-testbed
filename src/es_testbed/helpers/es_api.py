@@ -105,7 +105,7 @@ def create_data_stream(client: 'Elasticsearch', name: str) -> None:
     try:
         client.indices.create_data_stream(name=name)
         test = Exists(client, name=name, kind='datastream', pause=PAUSE_VALUE)
-        test.wait_for_it()
+        test.wait()
     except Exception as err:
         raise TestbedFailure(
             f'Unable to create datastream {name}. Error: {prettystr(err)}'
@@ -129,7 +129,7 @@ def create_index(
     )
     try:
         test = Exists(client, name=name, kind='index', pause=PAUSE_VALUE)
-        test.wait_for_it()
+        test.wait()
     except TimeoutException as err:
         raise ResultNotExpected(f'Failed to create index {name}') from err
     return exists(client, 'index', name)
@@ -190,7 +190,7 @@ def do_snap(
     """Perform a snapshot"""
     client.snapshot.create(repository=repo, snapshot=snap, indices=idx)
     test = Snapshot(client, snapshot=snap, repository=repo, pause=1, timeout=60)
-    test.wait_for_it()
+    test.wait()
 
     # Mount the index accordingly
     client.searchable_snapshots.mount(
@@ -436,7 +436,7 @@ def put_comp_tmpl(client: 'Elasticsearch', name: str, component: t.Dict) -> None
             name=name, template=component, create=True
         )
         test = Exists(client, name=name, kind='component', pause=PAUSE_VALUE)
-        test.wait_for_it()
+        test.wait()
     except Exception as err:
         raise TestbedFailure(
             f'Unable to create component template {name}. Error: {prettystr(err)}'
@@ -460,7 +460,7 @@ def put_idx_tmpl(
             create=True,
         )
         test = Exists(client, name=name, kind='template', pause=PAUSE_VALUE)
-        test.wait_for_it()
+        test.wait()
     except Exception as err:
         raise TestbedFailure(
             f'Unable to create index template {name}. Error: {prettystr(err)}'
