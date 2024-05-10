@@ -31,6 +31,7 @@ MAPPING: dict = {
 
 NAMEMAPPER: t.Dict[str, str] = {
     'index': 'idx',
+    'indices': 'idx',  # This is to aid testing and other places where kind is indices
     'data_stream': 'ds',
     'component': 'cmp',
     'ilm': 'ilm',
@@ -53,15 +54,10 @@ TESTPLAN: dict = {
     'rollover_alias': None,
     'ilm': {
         'enabled': False,
-        'tiers': ['hot', 'delete'],
+        'phases': ['hot', 'delete'],
+        'readonly': None,
         'forcemerge': False,
         'max_num_segments': 1,
-    },
-    'defaults': {
-        'entity_count': 3,
-        'docs': 10,
-        'match': True,
-        'searchable': None,
     },
     'entities': [],
 }
@@ -114,8 +110,8 @@ def ilmdelete() -> IlmPhase:
     return {'min_age': '5d', 'actions': {'delete': {}}}
 
 
-def ilm_phase(tier):
-    """Return the default phase step based on 'tier'"""
+def ilm_phase(value):
+    """Return the default phase step based on 'value'"""
     phase_map = {
         'hot': ilmhot(),
         'warm': ilmwarm(),
@@ -123,7 +119,7 @@ def ilm_phase(tier):
         'frozen': ilmfrozen(),
         'delete': ilmdelete(),
     }
-    return {tier: phase_map[tier]}
+    return {value: phase_map[value]}
 
 
 def ilm_force_merge(max_num_segments=1):

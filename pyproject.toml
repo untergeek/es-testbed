@@ -31,8 +31,9 @@ keywords = [
     'snapshot',
 ]
 dependencies = [
+    'gitpython==3.1.43',
     'dotmap==1.3.30',
-    'es_client==8.13.4',
+    'es_client==8.13.5',
     'es-wait==0.7.2',
 ]
 
@@ -88,17 +89,14 @@ detached = true
 dependencies = [
   'black>=23.1.0',
   'mypy>=1.0.0',
-  'ruff>=0.0.243',
 ]
 [tool.hatch.envs.lint.scripts]
 typing = 'mypy --install-types --non-interactive {args:src/es_testbed tests}'
 style = [
-  'ruff {args:.}',
   'black --check --diff {args:.}',
 ]
 fmt = [
   'black {args:.}',
-  'ruff --fix {args:.}',
   'style',
 ]
 all = [
@@ -111,61 +109,6 @@ target-version = ['py38']
 line-length = 88
 skip-string-normalization = true
 include = '\.pyi?$'
-
-[tool.ruff]
-target-version = 'py38'
-line-length = 120
-select = [
-  'A',
-  'ARG',
-  'B',
-  'C',
-  'DTZ',
-  'E',
-  'EM',
-  'F',
-  'FBT',
-  'I',
-  'ICN',
-  'ISC',
-  'N',
-  'PLC',
-  'PLE',
-  'PLR',
-  'PLW',
-  'Q',
-  'RUF',
-  'S',
-  'T',
-  'TID',
-  'UP',
-  'W',
-  'YTT',
-]
-ignore = [
-  # Allow non-abstract empty methods in abstract base classes
-  'B027',
-  # Allow boolean positional values in function calls, like `dict.get(... True)`
-  'FBT003',
-  # Ignore checks for possible passwords
-  'S105', 'S106', 'S107',
-  # Ignore complexity
-  'C901', 'PLR0911', 'PLR0912', 'PLR0913', 'PLR0915',
-]
-unfixable = [
-  # Don't touch unused imports
-  'F401',
-]
-
-[tool.ruff.isort]
-known-first-party = ['es_testbed']
-
-[tool.ruff.flake8-tidy-imports]
-ban-relative-imports = 'all'
-
-[tool.ruff.per-file-ignores]
-# Tests can use magic values, assertions, and relative imports
-'tests/**/*' = ['PLR2004', 'S101', 'TID252']
 
 [tool.coverage.run]
 source_pkgs = ['es_testbed', 'tests']

@@ -31,9 +31,10 @@ class IlmMgr(EntityMgr):
         """Return the configured ILM policy"""
         d = self.plan.ilm
         kwargs = {
-            'tiers': d.tiers,
+            'phases': d.phases,
             'forcemerge': d.forcemerge,
             'max_num_segments': d.max_num_segments,
+            'readonly': d.readonly,
             'repository': self.plan.repository,
         }
         return build_ilm_policy(**kwargs)
@@ -42,7 +43,8 @@ class IlmMgr(EntityMgr):
         """Setup the entity manager"""
         logger.debug('Starting IlmMgr setup...')
         if self.plan.ilm.enabled:
-            self.plan.ilm.policy = self.get_policy()
+            if not self.plan.ilm.policy:  # If you've put a full policy there...
+                self.plan.ilm.policy = self.get_policy()
             put_ilm(self.client, self.name, policy=self.plan.ilm.policy)
             # Verify existence
             if not exists(self.client, 'ilm', self.name):

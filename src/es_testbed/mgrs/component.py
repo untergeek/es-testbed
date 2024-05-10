@@ -2,9 +2,10 @@
 
 import typing as t
 import logging
+from importlib import import_module
 from es_testbed.exceptions import ResultNotExpected
 from es_testbed.helpers.es_api import exists, put_comp_tmpl
-from es_testbed.helpers.utils import mapping_component, prettystr, setting_component
+from es_testbed.helpers.utils import prettystr
 from es_testbed.mgrs.entity import EntityMgr
 
 if t.TYPE_CHECKING:
@@ -31,12 +32,16 @@ class ComponentMgr(EntityMgr):
     def components(self) -> t.Sequence[t.Dict]:
         """Return a list of component template dictionaries"""
         retval = []
-        kw = {
-            'ilm_policy': self.plan.ilm_policies[-1],
-            'rollover_alias': self.plan.rollover_alias,
-        }
-        retval.append(setting_component(**kw))
-        retval.append(mapping_component())
+        preset = import_module(f'{self.plan.modpath}.definitions')
+        val = preset.settings()
+        if self.plan.ilm_policies[-1]:
+            val['settings']['index.lifecycle.name'] = self.plan.ilm_policies[-1]
+            if self.plan.rollover_alias:
+                val['settings'][
+                    'index.lifecycle.rollover_alias'
+                ] = self.plan.rollover_alias
+        retval.append(val)
+        retval.append(preset.mappings())
         return retval
 
     def setup(self) -> None:

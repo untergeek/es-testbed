@@ -2,12 +2,13 @@
 
 import typing as t
 import logging
+from importlib import import_module
 from datetime import datetime, timezone
-from dotmap import DotMap
+from shutil import rmtree
 from es_testbed.exceptions import ResultNotExpected
 from es_testbed.defaults import NAMEMAPPER
 from es_testbed.helpers.es_api import delete, get
-from es_testbed.helpers.utils import prettystr
+from es_testbed.helpers.utils import prettystr, process_preset
 from es_testbed._plan import PlanBuilder
 from es_testbed.mgrs import (
     ComponentMgr,
@@ -23,39 +24,86 @@ if t.TYPE_CHECKING:
 
 logger = logging.getLogger('es_testbed.TestBed')
 
-# pylint: disable=R0902
+# pylint: disable=R0902,R0913
+
+# Preset Import
+# This imports the preset directory which must include the following files:
+# - A plan YAML file.
+# - A buildlist YAML file.
+# - A functions.py file (the actual python code), which must contain a
+#   function named doc_generator(). This function must accept all kwargs from
+#   the buildlist's options
+# - A definitions.py file, which is a Python variable file that helps find
+#   the path to the module, etc., as well as import the plan, the buildlist,
+#   the mappings and settings, etc. This must at least include a get_plan()
+#   function that returns a dictionary of a plan.
+# - A mappings.json file (contains the index mappings your docs need)
+# - A settings.json file (contains the index settings)
+#
+# Any other files can be included to help your doc_generator function, e.g.
+# Faker definitions and classes, etc. Once the preset module is imported,
+# relative imports should work.
 
 
 class TestBed:
     """TestBed Class"""
 
-    __test__ = False
+    __test__ = False  # Without this, this appears to be test class because of the name
 
     def __init__(
         self,
         client: 'Elasticsearch' = None,
-        plan: t.Union[DotMap, t.Dict, None] = None,
+        builtin: t.Union[str, None] = None,
+        path: t.Union[str, None] = None,
+        ref: t.Union[str, None] = None,
+        url: t.Union[str, None] = None,
+        scenario: t.Union[str, None] = None,
     ):
+        #: The plan settings
+        self.settings = None
+
+        modpath, tmpdir = process_preset(builtin, path, ref, url)
+        if modpath is None:
+            msg = 'Must define a preset'
+            logger.critical(msg)
+            raise ValueError(msg)
+
+        try:
+            preset = import_module(f'{modpath}.definitions')
+            self.settings = preset.get_plan(scenario)
+        except ImportError as err:
+            logger.critical('Preset settings incomplete or incorrect')
+            raise err
+
+        self.settings['modpath'] = modpath
+        if scenario:
+            self.settings['scenario'] = scenario
+        if tmpdir:
+            self.settings['tmpdir'] = tmpdir
+
+        #: The Elasticsearch client object
         self.client = client
-        if plan is None:
-            raise ValueError('Must provide a plan')
-        if isinstance(plan, PlanBuilder):
-            logger.debug('The plan is already PlanBuilder type.')
-            self.plan = plan.plan
-        elif isinstance(plan, dict):
-            logger.debug('The plan is a dict type.')
-            _ = PlanBuilder(settings=plan)
-            self.plan = _.plan
-        else:
-            raise ValueError('plan must be a PlanBuilder or settings dict')
+        #: The test plan
+        self.plan = None
 
         # Set up for tracking
+        #: The ILM entity manager
         self.ilmmgr = None
+        #: The Component Template entity manager
         self.componentmgr = None
+        #: The (index) Template entity manager
         self.templatemgr = None
+        #: The Snapshot entity manager
         self.snapshotmgr = None
+        #: The Index entity manager
         self.indexmgr = None
+        #: The data_stream entity manager
         self.data_streammgr = None
+
+        # At this point, we have an imported preset. If we need to tweak the plan, we
+        # just overwrite the values in the plan. We have the ILM settings, the
+        # index_buildlist, etc. We can update/change whatever we want right up until we
+        # call .setup()
 
     def _erase(self, kind: str, lst: t.Sequence[str]) -> None:
         overall_success = True
@@ -142,8 +190,9 @@ class TestBed:
 
     def setup(self) -> None:
         """Setup the instance"""
-        print('break on this line')
         start = datetime.now(timezone.utc)
+        # If we build self.plan here, then we can modify settings before setup()
+        self.plan = PlanBuilder(settings=self.settings).plan
         self.get_ilm_polling()
         logger.info('Setting: %s', self.ilm_polling(interval='1s'))
         self.client.cluster.put_settings(persistent=self.ilm_polling(interval='1s'))
@@ -175,6 +224,9 @@ class TestBed:
         """Tear down anything we created"""
         start = datetime.now(timezone.utc)
         successful = True
+        if self.plan.tmpdir:
+            logger.debug('Removing tmpdir: %s', self.plan.tmpdir)
+            rmtree(self.plan.tmpdir)  # Remove the tmpdir stored here
         for kind, list_of_kind in self._fodder_generator():
             if not self._erase(kind, list_of_kind):
                 successful = False

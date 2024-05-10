@@ -2,9 +2,10 @@
 
 import typing as t
 import logging
+from importlib import import_module
 from es_testbed.entities import Alias, Index
 from es_testbed.helpers.es_api import create_index, fill_index
-from es_testbed.helpers.utils import prettystr, setting_component
+from es_testbed.helpers.utils import prettystr
 from es_testbed.mgrs.entity import EntityMgr
 from es_testbed.mgrs.snapshot import SnapshotMgr
 
@@ -27,7 +28,6 @@ class IndexMgr(EntityMgr):
         plan: t.Union['DotMap', None] = None,
         snapmgr: t.Union[SnapshotMgr, None] = None,
     ):
-        self.doc_incr = 0
         self.snapmgr = snapmgr
         self.alias = None  # Only used for tracking the rollover alias
         super().__init__(client=client, plan=plan)
@@ -47,19 +47,12 @@ class IndexMgr(EntityMgr):
     def _rollover_path(self) -> None:
         """This is the execution path for rollover indices"""
         if not self.entity_list:
-            kw = {
-                'ilm_policy': self.policy_name,
-                'rollover_alias': self.plan.rollover_alias,
-            }
-            cfg = setting_component(**kw)['settings']
             acfg = {self.plan.rollover_alias: {'is_write_index': True}}
-            logger.debug(
-                'No indices created yet. Starting with a rollover alias index...'
-            )
-            create_index(self.client, self.name, aliases=acfg, settings=cfg)
-            logger.debug(
-                'Created %s with rollover alias %s', self.name, self.plan.rollover_alias
-            )
+            msg = 'No indices created yet. Starting with a rollover alias index...'
+            logger.debug(msg)
+            create_index(self.client, self.name, aliases=acfg)
+            msg = f'Created {self.name} with rollover alias {self.plan.rollover_alias}'
+            logger.debug(msg)
             self.track_alias()
         else:
             self.alias.rollover()
@@ -69,18 +62,25 @@ class IndexMgr(EntityMgr):
 
     def add(self, value) -> None:
         """Create a single index"""
-        # In this case, value is a single array element from plan.entities
         logger.debug('Creating index: "%s"', value)
         create_index(self.client, value)
 
     def add_indices(self) -> None:
         """Add indices according to plan"""
-        for scheme in self.plan.entities:
+        mod = import_module(f'{self.plan.modpath}.functions')
+        func = getattr(mod, 'doc_generator')
+        for scheme in self.plan.index_buildlist:
             if self.plan.rollover_alias:
                 self._rollover_path()
             else:
                 self.add(self.name)
-            self.filler(scheme)
+            # self.filler(scheme)
+            fill_index(
+                self.client,
+                name=self.name,
+                doc_generator=func,
+                options=scheme['options'],
+            )
             self.track_index(self.name)
         logger.debug('Created indices: %s', prettystr(self.indexlist))
         if self.plan.rollover_alias:
@@ -90,24 +90,11 @@ class IndexMgr(EntityMgr):
                     self.plan.rollover_alias,
                 )
 
-    def filler(self, scheme) -> None:
-        """If the scheme from the TestPlan says to write docs, do it"""
-        # scheme is a single array element from plan.entities
-        logger.debug('Adding docs to "%s"', self.name)
-        if scheme['docs'] > 0:
-            fill_index(
-                self.client,
-                name=self.name,
-                count=scheme['docs'],
-                start_num=self.doc_incr,
-                match=scheme['match'],
-            )
-        self.doc_incr += scheme['docs']
-
     def searchable(self) -> None:
         """If the indices were marked as searchable snapshots, we do that now"""
-        for idx, scheme in enumerate(self.plan.entities):
-            self.entity_list[idx].mount_ss(scheme)
+        for idx, scheme in enumerate(self.plan.index_buildlist):
+            if scheme['target_tier'] in ['cold', 'frozen']:
+                self.entity_list[idx].mount_ss(scheme)
 
     def setup(self) -> None:
         """Setup the entity manager"""

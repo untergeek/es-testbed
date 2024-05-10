@@ -2,51 +2,26 @@
 
 from . import TestAny
 
-SSTIER = 'frozen'
-REPOTEST = True
-ILM = {
-    'enabled': True,
-    'tiers': ['hot', SSTIER, 'delete'],
-    'forcemerge': False,
-    'max_num_segments': 1,
-}
-
 
 class TestDataStream(TestAny):
     """TestDataStream"""
 
-    sstier = SSTIER
-    kind = 'data_stream'
-    roll = False
-    repo_test = REPOTEST
-    ilm = ILM
+    scenario = 'frozen_ds'
 
 
 class TestIndices(TestAny):
     """TestIndices"""
 
-    sstier = SSTIER
-    kind = 'indices'
-    roll = False
-    repo_test = REPOTEST
-    ilm = {'enabled': False}
+    scenario = 'frozen'
 
 
 class TestRolloverIndices(TestAny):
     """TestRolloverIndices"""
 
-    sstier = SSTIER
-    kind = 'indices'
-    roll = True
-    repo_test = REPOTEST
-    ilm = {'enabled': False}
+    scenario = 'frozen_rollover'
 
 
 class TestRolloverIndicesILM(TestAny):
     """TestRolloverIndicesILM"""
 
-    sstier = SSTIER
-    kind = 'indices'
-    roll = True
-    repo_test = REPOTEST
-    ilm = ILM
+    scenario = 'frozen_ilm'

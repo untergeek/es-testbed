@@ -14,7 +14,6 @@ from ..exceptions import (
     TimeoutException,
 )
 from ..helpers.utils import (
-    doc_gen,
     get_routing,
     mounted_name,
     prettystr,
@@ -104,7 +103,7 @@ def create_data_stream(client: 'Elasticsearch', name: str) -> None:
     """Create a datastream"""
     try:
         client.indices.create_data_stream(name=name)
-        test = Exists(client, name=name, kind='datastream', pause=PAUSE_VALUE)
+        test = Exists(client, name=name, kind='data_stream', pause=PAUSE_VALUE)
         test.wait()
     except Exception as err:
         raise TestbedFailure(
@@ -233,30 +232,21 @@ def exists(
 def fill_index(
     client: 'Elasticsearch',
     name: t.Union[str, None] = None,
-    count: t.Union[int, None] = None,
-    start_num: t.Union[int, None] = None,
-    match: bool = True,
+    doc_generator: t.Union[t.Generator[t.Dict, None, None], None] = None,
+    options: t.Union[t.Dict, None] = None,
 ) -> None:
     """
     Create and fill the named index with mappings and settings as directed
 
     :param client: ES client
     :param name: Index name
-    :param count: The number of docs to create
-    :param start_number: Where to start the incrementing number
-    :param match: Whether to use the default values for key (True) or random strings
-        (False)
+    :param doc_generator: The generator function
 
-    :type client: es
-    :type name: str
-    :type count: int
-    :type start_number: int
-    :type match: bool
-
-    :rtype: None
     :returns: No return value
     """
-    for doc in doc_gen(count=count, start_at=start_num, match=match):
+    if not options:
+        options = {}
+    for doc in doc_generator(**options):
         client.index(index=name, document=doc)
     client.indices.flush(index=name)
     client.indices.refresh(index=name)
