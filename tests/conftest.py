@@ -77,12 +77,9 @@ def client():
     set_logging({'loglevel': LOGLEVEL, 'blacklist': ['elastic_transport', 'urllib3']})
     builder = Builder(**kwargs)
     builder.connect()
-    if builder.client.license.get_trial_status()['eligible_to_start_trial']:
-        builder.client.license.post_start_trial(acknowledge=True)
     # This is a contradiction that cannot exist...
     if repo == 'found-snapshots' and host == 'https://127.0.0.1:9200' and not file:
-        # We'll make our own and set the ENV var
-        create_repository(builder.client, LOCALREPO)
+        # Reset the env var
         environ['TEST_ES_REPO'] = LOCALREPO
     return builder.client
 
@@ -121,7 +118,7 @@ def entity_count(defaults):
     def _entity_count(kind):
         if kind == 'data_stream':
             return 1
-        return defaults()['entity_count']
+        return defaults()['count']
 
     return _entity_count
 
@@ -129,7 +126,7 @@ def entity_count(defaults):
 @pytest.fixture(scope='class')
 def defaults() -> t.Dict:
     def _defaults(sstier: str = 'hot') -> t.Dict:
-        retval = {'entity_count': 3, 'docs': 10, 'match': True, 'searchable': None}
+        retval = {'count': 3, 'docs': 10, 'match': True, 'searchable': None}
         if sstier in ['cold', 'frozen']:
             retval['searchable'] = sstier
         return retval
@@ -219,8 +216,6 @@ def last():
 @pytest.fixture(scope='class')
 def namecore(prefix, uniq):
     def _namecore(kind):
-        if kind == 'indices':
-            return f'{prefix}-{NAMEMAPPER["index"]}-{uniq}'
         return f'{prefix}-{NAMEMAPPER[kind]}-{uniq}'
 
     return _namecore
@@ -269,9 +264,7 @@ def rollable():
 def rollovername(namecore, rollable):
     def _rollovername(plan):
         if rollable(plan):
-            if plan.type == 'data_stream':
-                return namecore(plan.type)
-            return namecore('index')
+            return namecore(plan.type)
         return ''
 
     return _rollovername

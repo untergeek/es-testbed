@@ -2,8 +2,9 @@
 
 import typing as t
 import logging
+from importlib import import_module
 from es_testbed.entities import DataStream, Index
-from es_testbed.helpers.es_api import create_data_stream
+from es_testbed.helpers.es_api import create_data_stream, fill_index
 from es_testbed.helpers.utils import prettystr
 from es_testbed.mgrs.index import IndexMgr
 from es_testbed.mgrs.snapshot import SnapshotMgr
@@ -43,12 +44,16 @@ class DataStreamMgr(IndexMgr):
 
     def add(self, value):
         """Create a data stream and track it"""
-        create_data_stream(self.client, value)
+        try:
+            create_data_stream(self.client, value)
+        except Exception as err:
+            logger.critical('Error creating data_stream: %s', err)
+            raise err
         self.track_data_stream()
 
     def searchable(self):
         """If the indices were marked as searchable snapshots, we do that now"""
-        for idx, scheme in enumerate(self.plan.entities):
+        for idx, scheme in enumerate(self.plan.index_buildlist):
             self.index_trackers[idx].mount_ss(scheme)
         logger.info('Completed backing index promotion to searchable snapshots.')
         logger.info(
@@ -58,12 +63,19 @@ class DataStreamMgr(IndexMgr):
     def setup(self) -> None:
         """Setup the entity manager"""
         self.index_trackers = []  # Inheritance oddity requires redeclaration here
-        for scheme in self.plan.entities:
+        mod = import_module(f'{self.plan.modpath}.functions')
+        func = getattr(mod, 'doc_generator')
+        for scheme in self.plan.index_buildlist:
             if not self.entity_list:
                 self.add(self.name)
             else:
                 self.ds.rollover()
-            self.filler(scheme)
+            fill_index(
+                self.client,
+                name=self.name,
+                doc_generator=func,
+                options=scheme['options'],
+            )
         logger.debug('Created data_stream: %s', self.ds.name)
         logger.debug(
             'Created data_stream backing indices: %s',

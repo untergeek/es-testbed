@@ -1,0 +1,17 @@
+{
+  "mappings": {
+    "properties": {
+      "@timestamp": {"type": "date"},
+      "message": {"type": "keyword"},
+      "number": {"type": "long"},
+      "nested": {"properties": {"key": {"type": "keyword"}}},
+      "deep": {
+        "properties": {
+          "l1": {
+            "properties": {"l2": {"properties": {"l3": {"type": "keyword"}}}}
+          }
+        }
+      }
+    }
+  }
+} 

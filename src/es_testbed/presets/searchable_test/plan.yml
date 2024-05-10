@@ -1,0 +1,11 @@
+---
+# Default values that can be overriden by scenarios
+type: indices
+rollover_alias: False
+repository: testing
+ilm:
+  enabled: False
+  phases: [hot, delete]
+  readonly: None
+  max_num_segments: 1
+  forcemerge: False

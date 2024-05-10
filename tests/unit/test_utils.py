@@ -3,7 +3,6 @@
 # pylint: disable=missing-function-docstring,redefined-outer-name
 import typing as t
 import pytest
-from dotmap import DotMap
 from es_testbed.defaults import (
     ilmhot,
     ilmwarm,
@@ -12,7 +11,7 @@ from es_testbed.defaults import (
     ilmdelete,
 )
 from es_testbed.exceptions import TestbedMisconfig
-from es_testbed.helpers.utils import build_ilm_phase, build_ilm_policy, doc_gen
+from es_testbed.helpers.utils import build_ilm_phase, build_ilm_policy
 
 FMAP: t.Dict[str, t.Dict] = {
     'hot': ilmhot(),
@@ -74,14 +73,16 @@ def builtphase():
 
 
 def test_build_ilm_phase_defaults(builtphase, tiertestval):
-    for tier in TIERS:
-        assert builtphase(tier, repo=TREPO[tier]) == tiertestval(tier, repo=TREPO[tier])
+    for phase in TIERS:
+        assert builtphase(phase, repo=TREPO[phase]) == tiertestval(
+            phase, repo=TREPO[phase]
+        )
 
 
 def test_build_ilm_phase_add_action():
-    expected = {'foo': 'bar'}
-    tier = 'warm'
-    assert build_ilm_phase(tier, actions=expected)[tier]['actions'] == expected
+    expected = {'read_only': {}}
+    phase = 'warm'
+    assert build_ilm_phase(phase, actions=expected)[phase]['actions'] == expected
 
 
 def test_build_ilm_phase_fail_repo(builtphase):
@@ -120,29 +121,14 @@ def test_build_ilm_policy(tiertestval):
         # passing dict['phases']['tier']
 
 
+def test_build_ilm_policy_read_only():
+    expected = {'warm': {'min_age': '2d', 'actions': {'readonly': {}}}}
+    # To keep the line more readable, build the kwargs as a dict first
+    kwargs = {'readonly': 'warm'}
+    # Then pass it as **kwargs
+    assert build_ilm_policy(['warm'], **kwargs) == {'phases': expected}
+
+
 def test_build_ilm_policy_fail_repo():
     with pytest.raises(TestbedMisconfig):
         build_ilm_policy(['hot', 'frozen'], repository=None)
-
-
-@pytest.fixture
-def fieldmatch():
-    def _fieldmatch(val: str, num: int):
-        return f'{val}{num}'
-
-    return _fieldmatch
-
-
-def test_doc_gen_matching(fieldmatch):
-    i = 0
-    for res in doc_gen(count=3, start_at=0, match=True):
-        doc = DotMap(res)
-        tests = [
-            (doc.message, 'message'),
-            (doc.nested.key, 'nested'),
-            (doc.deep.l1.l2.l3, 'deep'),
-        ]
-        for test in tests:
-            dm, val = test
-            assert dm == fieldmatch(val, i)
-        i += 1

@@ -1,0 +1,17 @@
+---
+index_buildlist:
+  - options:
+      count: 10
+      start_at: 0
+      match: True
+    target_tier: hot
+  - options:
+      count: 10
+      start_at: 10
+      match: True
+    target_tier: hot
+  - options:
+      count: 10
+      start_at: 20
+      match: True
+    target_tier: hot

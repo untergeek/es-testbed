@@ -162,10 +162,10 @@ class Index(Entity):
         If we are NOT using ILM but have specified searchable snapshots in the plan
         entities
         """
-        if 'searchable' in scheme and scheme['searchable'] is not None:
-            self.snapmgr.add(self.name, scheme['searchable'])
+        if 'target_tier' in scheme and scheme['target_tier'] in ['cold', 'frozen']:
+            self.snapmgr.add(self.name, scheme['target_tier'])
             # Replace self.name with the renamed name
-            self.name = mounted_name(self.name, scheme['searchable'])
+            self.name = mounted_name(self.name, scheme['target_tier'])
 
     def mount_ss(self, scheme: dict) -> None:
         """If the index is planned to become a searchable snapshot, we do that now"""

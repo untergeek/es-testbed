@@ -1,9 +1,8 @@
 # Project Specific Files
 
-docker_test/Dockerfile
+docker_test/createrepo.json
 docker_test/.kurl
 docker_test/repo
-tests/integration/http_ca.crt
 http_ca.crt
 wtf.py
 
