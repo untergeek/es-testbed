@@ -47,10 +47,11 @@ class TestAny:
     scenario = None
 
     @pytest.fixture(scope="class")
-    def tb(self, client, prefix, uniq, skip_no_repo, skip_localhost):
+    def tb(self, client, prefix, uniq, skip_no_repo):  # skip_localhost fixed?
         """TestBed setup/teardown"""
         skip_no_repo(get_sstier(self.scenario) in ['cold', 'frozen'])
-        skip_localhost(bool(self.scenario in ['frozen_ilm', 'frozen_ds']))
+        # skip_localhost(bool(self.scenario in ['frozen_ilm', 'frozen_ds']))
+        # 8.15.0 seems to work okay for the Docker-based cold & frozen tests.
         teebee = TestBed(client, builtin='searchable_test', scenario=self.scenario)
         # Update plan settings for testing
         teebee.settings['prefix'] = prefix
