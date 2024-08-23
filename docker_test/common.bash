@@ -3,6 +3,7 @@
 # Source the common.bash file from the same path as the script
 source $(dirname "$0")/ansi_clean.bash
 
+#MANUAL_PROJECT_NAME=project_name
 DOCKER_PORT=9200
 LOCAL_PORT=9200
 URL_HOST=127.0.0.1
@@ -12,7 +13,7 @@ CURLFILE=.kurl
 REPODOCKER=/media
 REPOJSON=createrepo.json
 REPONAME=testing
-LIMIT=30
+LIMIT=30  # How many seconds to wait to obtain the credentials
 IMAGE=docker.elastic.co/elasticsearch/elasticsearch
 MEMORY=1GB  # The heap will be half of this
 
@@ -164,8 +165,11 @@ EXECPATH=$(pwd)
 # Extract the path for the script
 SCRIPTPATH="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P)"
 
-# Set the $PROJECT_ROOT/tests/integration path
+# Ensure we are in the script path
 cd ${SCRIPTPATH}
+
+# Get the directory name
+SCRIPTPATH_NAME=$(pwd | awk -F\/ '{print $NF}')
 
 # Go up a level
 cd ../
@@ -173,8 +177,21 @@ cd ../
 # Find out what the last part of this directory is called
 PROJECT_NAME=$(pwd | awk -F\/ '{print $NF}')
 
+# Manually override the project name, if specified
+if [ "x${MANUAL_PROJECT_NAME}" != "x" ]; then
+  PROJECT_NAME=${MANUAL_PROJECT_NAME}
+fi
+
 # We should be at the project root dir now
 PROJECT_ROOT=$(pwd)
+
+if [ "${SCRIPTPATH_NAME}" != "docker_test" ]; then
+  echo "$0 is not in parent directory 'docker_test'"
+  echo "This could cause issues as that is expected."
+  echo "PROJECT_ROOT is now set to ${SCRIPTPATH}"
+  echo "You may want to set MANUAL_PROJECT_NAME in common.bash"
+  PROJECT_ROOT=${SCRIPTPATH}
+fi
 
 # If we have a tests/integration path, then we'll use that
 if [ -d "tests/integration" ]; then

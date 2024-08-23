@@ -1,7 +1,10 @@
 #!/bin/bash
 
+
 # Source the common.bash file from the same path as the script
 source $(dirname "$0")/common.bash
+
+echo
 
 # Test to see if we were passed a VERSION
 if [ "x${1}" == "x" ]; then
@@ -26,13 +29,13 @@ mkdir -p ${REPOLOCAL}
 ### Run Container ###
 #####################
 
-docker network rm -f ${NAME}-net
-docker network create ${NAME}-net
+docker network rm -f ${NAME}-net > /dev/null 2>&1
+docker network create ${NAME}-net > /dev/null 2>&1
 
 # Start the container
 echo "Starting container \"${NAME}\" from ${IMAGE}:${VERSION}"
 echo -en "Container ID: "
-docker run -d -it --name ${NAME} --network ${NAME}-net -m ${MEMORY} \
+docker run -q -d -it --name ${NAME} --network ${NAME}-net -m ${MEMORY} \
   -p ${LOCAL_PORT}:${DOCKER_PORT} \
   -v ${REPOLOCAL}:${REPODOCKER} \
   -e "discovery.type=single-node" \
@@ -74,6 +77,9 @@ fi
 # We expect a 200 HTTP rsponse
 EXPECTED=200
 
+# Set the NODE var
+NODE="${NAME} instance"
+
 # Start with an empty value
 ACTUAL=0
 
@@ -88,12 +94,11 @@ while [ "${ACTUAL}" != "${EXPECTED}" ] && [ ${COUNTER} -lt ${LIMIT} ]; do
   ACTUAL=$(curl -K ${CURLCFG} ${URL})
 
   # Report what we received
-  echo -en "\rWaiting for Elasticsearch. HTTP Status Code: ${ACTUAL}"
+  echo -en "\rHTTP status code for ${NODE} is: ${ACTUAL}"
 
   # If we got what we expected, we're great!
   if [ "${ACTUAL}" == "${EXPECTED}" ]; then
-    echo
-    echo "Elasticsearch is ready!"
+    echo " --- ${NODE} is ready!"
 
   else
     # Otherwise sleep and try again 
@@ -130,6 +135,7 @@ fi
 
 rm -f ${REPOJSON}  
 
+# Build a pretty JSON object defining the repository settings
 echo    '{'                    >> $REPOJSON
 echo    '  "type": "fs",'      >> $REPOJSON
 echo    '  "settings": {'      >> $REPOJSON
@@ -151,7 +157,7 @@ if [ "$response" != "$expected" ]; then
   echo "ERROR! Unable to create snapshot repository"
 else
   echo "Snapshot repository \"${REPONAME}\" created."
-  # Put ESCLIENT_ env var export here?
+  rm -f ${REPOJSON}
 fi
 
 
@@ -160,14 +166,14 @@ fi
 ##################
 
 echo
-echo "Elasticsearch container \"${NAME}\" is up!"
+echo "${NAME} container is up using image elasticsearch:${VERSION}"
 echo "Ready to test!"
 echo
 
 if [ "$EXECPATH" == "$PROJECT_ROOT" ]; then
   echo "Environment variables are in .env"
 elif [ "$EXECPATH" == "$SCRIPTPATH" ]; then
-  echo "\$PWD is $SCRIPTPATH." 
+  echo "\$PWD is $SCRIPTPATH."
   echo "Environment variables are in ../.env"
 else
   echo "Environment variables are in ${PROJECT_ROOT}/.env"
