@@ -163,6 +163,9 @@ def prettystr(*args, **kwargs) -> str:
     'Return the formatted representation of object as a string. indent, width, depth,
     compact, sort_dicts and underscore_numbers are passed to the PrettyPrinter
     constructor as formatting parameters' (from pprint documentation).
+
+    The keyword arg, ``underscore_numbers`` is only available in Python versions
+    3.10 and up, so there is a test here to add it when that is the case.
     """
     defaults = [
         ('indent', 2),
@@ -170,8 +173,11 @@ def prettystr(*args, **kwargs) -> str:
         ('depth', None),
         ('compact', False),
         ('sort_dicts', False),
-        ('underscore_numbers', False),
     ]
+    vinfo = python_version()
+    if vinfo[0] == 3 and vinfo[1] >= 10:
+        # underscore_numbers only works in 3.10 and up
+        defaults.append(('underscore_numbers', False))
     kw = {}
     for tup in defaults:
         key, default = tup
@@ -223,6 +229,14 @@ def process_preset(
         # We now make the parent path part of the sys.path.
         sys.path.insert(0, parent)  # This should persist beyond this module
     return modpath, tmpdir
+
+
+def python_version() -> t.Tuple:
+    """
+    Return running Python version tuple, e.g. 3.12.2 would be (3, 12, 2)
+    """
+    _ = sys.version_info
+    return (_[0], _[1], _[2])
 
 
 def raise_on_none(**kwargs):

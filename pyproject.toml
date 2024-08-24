@@ -76,7 +76,7 @@ cov = [
   'cov-report',
 ]
 
-[[tool.hatch.envs.all.matrix]]
+[[tool.hatch.envs.test.matrix]]
 python = ['3.8', '3.9', '3.10', '3.11', '3.12']
 
 [tool.hatch.envs.test.scripts]
