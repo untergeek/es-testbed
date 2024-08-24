@@ -80,7 +80,20 @@ TIER: dict = {
 TIMEOUT_DEFAULT: str = '30'
 TIMEOUT_ENVVAR: str = 'ES_TESTBED_TIMEOUT'
 
-IlmPhase: t.TypeAlias = t.Dict[
+# Define IlmPhase as a typing alias to be reused multiple times
+#
+# In all currently supported Python versions (3.8 -> 3.12), the syntax:
+#
+#   IlmPhase = t.Dict[
+#
+# is supported. In 3.10 and up, you can use the more explicit syntax:
+#
+#   IlmPhase: t.TypeAlias = t.Dict[
+#
+# making use of the TypeAlias class.
+#
+# To support Python versions 3.8 and 3.9 (still), the older syntax is used.
+IlmPhase = t.Dict[
     str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]
 ]
 

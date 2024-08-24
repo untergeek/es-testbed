@@ -25,6 +25,7 @@ def get_plan(scenario: str = None) -> dict:
     retval.update(buildlist())
     if not scenario:
         return retval
+    retval['uniq'] = f'scenario-{scenario}'
     newvals = getattr(scenarios, scenario)
     ilm = {}
     if 'ilm' in newvals:
