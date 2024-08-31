@@ -5,17 +5,31 @@
 source $(dirname "$0")/common.bash
 
 echo
+NODECOUNT=1
+ROLES="\"data\", \"data_content\", \"data_hot\", \"data_warm\", \"data_cold\", \"master\", \"ingest\""
 
 # Test to see if we were passed a VERSION
 if [ "x${1}" == "x" ]; then
   echo "Error! No Elasticsearch version provided."
   echo "VERSION must be in Semver format, e.g. X.Y.Z, 8.6.0"
-  echo "USAGE: ${0} VERSION"
+  echo "USAGE: ${0} VERSION [SCENARIO]" 
   exit 1
+fi
+
+# Test to see if we were passed another argument
+if [ "x${2}" != "x" ]; then
+  source ${SCRIPTPATH}/scenarios.bash
+  echo "Using scenario: ${2}"
 fi
 
 # Set the version
 VERSION=${1}
+# Add ES_VERSION to ${ENVCFG}
+echo "export ES_VERSION=${VERSION}" >> ${ENVCFG}
+
+# Start console output
+echo "Using Elasticsearch version ${VERSION}"
+echo
 
 ######################################
 ### Setup snapshot repository path ###
@@ -29,26 +43,21 @@ mkdir -p ${REPOLOCAL}
 ### Run Container ###
 #####################
 
-docker network rm -f ${NAME}-net > /dev/null 2>&1
-docker network create ${NAME}-net > /dev/null 2>&1
+docker network rm -f ${TRUNK}-net > /dev/null 2>&1
+docker network create ${TRUNK}-net > /dev/null 2>&1
+
 
 # Start the container
-echo "Starting container \"${NAME}\" from ${IMAGE}:${VERSION}"
-echo -en "Container ID: "
-docker run -q -d -it --name ${NAME} --network ${NAME}-net -m ${MEMORY} \
-  -p ${LOCAL_PORT}:${DOCKER_PORT} \
-  -v ${REPOLOCAL}:${REPODOCKER} \
-  -e "discovery.type=single-node" \
-  -e "cluster.name=local-cluster" \
-  -e "node.name=local-node" \
-  -e "xpack.monitoring.templates.enabled=false" \
-  -e "path.repo=${REPODOCKER}" \
-${IMAGE}:${VERSION}
+echo "Creating ${NODECOUNT} node(s)..."
+echo 
+
+echo "Starting node 1..."
+start_container "1"
 
 # Set the URL
 URL=https://${URL_HOST}:${LOCAL_PORT}
 
-# Add TESTPATH to ${ENVCFG}, creating it or overwriting it
+# Add TESTPATH to ${ENVCFG}
 echo "export CA_CRT=${PROJECT_ROOT}/http_ca.crt" >> ${ENVCFG}
 echo "export TEST_PATH=${TESTPATH}" >> ${ENVCFG}
 echo "export TEST_ES_SERVER=${URL}" >> ${ENVCFG}
@@ -65,6 +74,7 @@ echo '-w "%{http_code}\n"' >> ${CURLCFG}
 
 # Do the xpack_fork function, passing the container name and the .env file path
 xpack_fork "${NAME}" "${ENVCFG}"
+echo
 
 # Did we get a bad return code?
 if [ $? -eq 1 ]; then
@@ -74,51 +84,7 @@ if [ $? -eq 1 ]; then
   exit 1
 fi
 
-# We expect a 200 HTTP rsponse
-EXPECTED=200
-
-# Set the NODE var
-NODE="${NAME} instance"
-
-# Start with an empty value
-ACTUAL=0
-
-# Initialize loop counter
-COUNTER=0
-
-# Loop until we get our 200 code
-echo
-while [ "${ACTUAL}" != "${EXPECTED}" ] && [ ${COUNTER} -lt ${LIMIT} ]; do
-
-  # Get our actual response
-  ACTUAL=$(curl -K ${CURLCFG} ${URL})
-
-  # Report what we received
-  echo -en "\rHTTP status code for ${NODE} is: ${ACTUAL}"
-
-  # If we got what we expected, we're great!
-  if [ "${ACTUAL}" == "${EXPECTED}" ]; then
-    echo " --- ${NODE} is ready!"
-
-  else
-    # Otherwise sleep and try again 
-    sleep 1
-    ((++COUNTER))
-  fi
-
-done
-# End while loop
-
-# If we still don't have what we expected, we hit the LIMIT
-if [ "${ACTUAL}" != "${EXPECTED}" ]; then
-  
-  echo "Unable to connect to ${URL} in ${LIMIT} seconds. Unable to continue. Exiting..." 
-  exit 1
-
-fi
-
 # Initialize trial license
-echo
 response=$(curl -s \
   --cacert ${CACRT} -u "${ESUSR}:${ESPWD}" \
   -XPOST "${URL}/_license/start_trial?acknowledge=true")
@@ -126,8 +92,9 @@ response=$(curl -s \
 expected='{"acknowledged":true,"trial_was_started":true,"type":"trial"}'
 if [ "$response" != "$expected" ]; then
   echo "ERROR! Unable to start trial license!"
+  exit 1
 else
-  echo -n "Trial license started and acknowledged. "
+  echo "Trial license started..."
 fi
 
 # Set up snapshot repository. The following will create a JSON file suitable for use with
@@ -155,19 +122,30 @@ response=$(curl -s \
 expected='{"acknowledged":true}'
 if [ "$response" != "$expected" ]; then
   echo "ERROR! Unable to create snapshot repository"
+  exit 1
 else
-  echo "Snapshot repository \"${REPONAME}\" created."
+  echo "Snapshot repository initialized..."
   rm -f ${REPOJSON}
 fi
 
+echo
+echo "Node 1 started."
+
+if [ ${NODECOUNT} -gt 1 ]; then
+  for i in $(seq 2 ${NODECOUNT}); do
+    CAPTURE=$(start_container "${i}" "${NODETOKEN}" "${ROLES}")
+    testport=$(( 9200 + ${i} -1 ))
+    CAPTURE=$(check_url "https://${URL_HOST}:${testport}")
+    echo "Node ${i} started."
+  done
+fi
 
 ##################
 ### Wrap it up ###
 ##################
 
 echo
-echo "${NAME} container is up using image elasticsearch:${VERSION}"
-echo "Ready to test!"
+echo "All nodes ready to test!"
 echo
 
 if [ "$EXECPATH" == "$PROJECT_ROOT" ]; then

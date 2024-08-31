@@ -1,15 +1,15 @@
 """
 Searchable Snapshot Test Scenarios
 
-We use deepcopy to ensure that other scenarios changes don't propagate. We can't use
-constants as the values need to be changed, so deepcopy has us covered.
-
 The repository should be configurable at runtime, so we make it use the TEST_ES_REPO
 env var.
 """
 
 from os import environ
-from copy import deepcopy
+import typing as t
+import logging
+
+logger = logging.getLogger(__name__)
 
 REPOSITORY = environ.get('TEST_ES_REPO', 'found-snapshots')
 
@@ -26,89 +26,141 @@ REPOSITORY = environ.get('TEST_ES_REPO', 'found-snapshots')
 #     },
 # }
 
-bl = [
-    {
-        'options': {
-            'count': 10,
-            'start_at': 0,
-            'match': True,
-        },
-        'target_tier': 'frozen',
-    },
-    {
-        'options': {
-            'count': 10,
-            'start_at': 10,
-            'match': True,
-        },
-        'target_tier': 'frozen',
-    },
-    {
-        'options': {
-            'count': 10,
-            'start_at': 20,
-            'match': True,
-        },
-        'target_tier': 'hot',
-    },
-]
 
-# #####################
-# ### Hot Scenarios ###
-# #####################
+class Scenarios:
+    """Scenarios Class"""
 
-hot = {}  # The default
-hot_rollover = {'rollover_alias': True}
-hot_ds = {'type': 'data_stream'}
+    def __init__(self):
+        """Initialize the scenarios for this preset"""
 
-# ######################
-# ### Cold Scenarios ###
-# ######################
+    # #####################
+    # ### Hot Scenarios ###
+    # #####################
 
-# Define the basic cold scenario
-cold = {'repository': REPOSITORY, 'index_buildlist': deepcopy(bl)}
-cold['index_buildlist'][0]['target_tier'] = 'cold'
-cold['index_buildlist'][1]['target_tier'] = 'cold'
-cold['index_buildlist'][2]['target_tier'] = 'cold'
+    @property
+    def hot(self):
+        """Basic hot scenario"""
+        return self.scenario_builder('hot', 'basic')
 
-# Define the rollover_alias cold scenario
-cold_rollover = deepcopy(cold)
-cold_rollover['index_buildlist'][2]['target_tier'] = 'hot'
-cold_rollover['rollover_alias'] = True
+    @property
+    def hot_rollover(self):
+        """Hot rollover index scenario"""
+        return self.scenario_builder('hot', 'rollover')
 
-# Define the cold ILM scenario
-cold_ilm = {
-    'repository': REPOSITORY,
-    'rollover_alias': True,
-    'ilm': {'enabled': True, 'phases': ['hot', 'cold', 'delete']},
-}
+    @property
+    def hot_ds(self):
+        """Hot data_stream scenario"""
+        return self.scenario_builder('hot', 'data_stream')
 
-# Define the cold data_stream scenario
-cold_ds = deepcopy(cold_ilm)
-cold_ds['type'] = 'data_stream'
+    # ######################
+    # ### Cold Scenarios ###
+    # ######################
 
-# ########################
-# ### Frozen Scenarios ###
-# ########################
+    @property
+    def cold(self):
+        """Basic cold scenario"""
+        return self.scenario_builder('cold', 'basic')
 
-# Define the basic frozen scenario
-frozen = {'repository': REPOSITORY, 'index_buildlist': deepcopy(bl)}
-frozen['index_buildlist'][0]['target_tier'] = 'frozen'
-frozen['index_buildlist'][1]['target_tier'] = 'frozen'
-frozen['index_buildlist'][2]['target_tier'] = 'frozen'
+    @property
+    def cold_rollover(self):
+        """Cold rollover index scenario"""
+        return self.scenario_builder('cold', 'rollover')
 
-# Define the rollover_alias frozen scenario
-frozen_rollover = deepcopy(frozen)
-frozen_rollover['index_buildlist'][2]['target_tier'] = 'hot'
-frozen_rollover['rollover_alias'] = True
+    @property
+    def cold_ilm(self):
+        """Cold ilm index scenario"""
+        return self.scenario_builder('cold', 'ilm')
 
-# Define the frozen ILM scenario
-frozen_ilm = {
-    'repository': REPOSITORY,
-    'rollover_alias': True,
-    'ilm': {'enabled': True, 'phases': ['hot', 'frozen', 'delete']},
-}
+    @property
+    def cold_ds(self):
+        """Cold data_stream scenario"""
+        return self.scenario_builder('cold', 'data_stream')
 
-# Define the frozen data_stream scenario
-frozen_ds = deepcopy(frozen_ilm)
-frozen_ds['type'] = 'data_stream'
+    # ########################
+    # ### Frozen Scenarios ###
+    # ########################
+
+    @property
+    def frozen(self):
+        """Basic frozen scenario"""
+        return self.scenario_builder('frozen', 'basic')
+
+    @property
+    def frozen_rollover(self):
+        """Frozen rollover index scenario"""
+        return self.scenario_builder('frozen', 'rollover')
+
+    @property
+    def frozen_ilm(self):
+        """Frozen ilm index scenario"""
+        return self.scenario_builder('frozen', 'ilm')
+
+    @property
+    def frozen_ds(self):
+        """Frozen data_stream scenario"""
+        return self.scenario_builder('frozen', 'data_stream')
+
+    def build_list(self) -> t.Sequence[t.Dict]:
+        """The plan build list for these scenarios"""
+        return [
+            {
+                'options': {
+                    'count': 10,
+                    'start_at': 0,
+                    'match': True,
+                },
+                'target_tier': 'frozen',
+            },
+            {
+                'options': {
+                    'count': 10,
+                    'start_at': 10,
+                    'match': True,
+                },
+                'target_tier': 'frozen',
+            },
+            {
+                'options': {
+                    'count': 10,
+                    'start_at': 20,
+                    'match': True,
+                },
+                'target_tier': 'hot',
+            },
+        ]
+
+    def define_ilm(
+        self,
+        phase: t.Literal['hot', 'warm', 'cold', 'frozen'],
+        subtype: t.Literal['basic', 'rollover', 'ilm', 'data_stream'],
+    ) -> t.Union[t.Dict, bool]:
+        """Return ILM based on subtype"""
+        retval = {'enabled': False, 'phases': ['hot', 'delete']}
+        if phase in ['cold', 'frozen']:
+            retval['phases'].append(phase)
+        if subtype in ['ilm', 'data_stream']:
+            retval['enabled'] = True
+        return retval
+
+    def scenario_builder(
+        self,
+        phase: t.Literal['hot', 'warm', 'cold', 'frozen'] = 'hot',
+        subtype: t.Literal['basic', 'rollover', 'ilm', 'data_stream'] = 'basic',
+    ) -> t.Dict:
+        """Build a scenario"""
+        retval = {
+            'repository': REPOSITORY,
+            'index_buildlist': self.build_list(),
+            'ilm': {'enabled': False, 'phases': ['hot', 'delete']},
+        }
+        for idx in range(0, len(retval['index_buildlist'])):
+            # By default, make everything have the phase as the target_tier
+            retval['index_buildlist'][idx]['target_tier'] = phase
+        if subtype != 'basic':
+            # The last entry should always be hot in rollover, ilm, and data_stream
+            retval['index_buildlist'][-1]['target_tier'] = 'hot'
+        if subtype in ['rollover', 'ilm']:
+            retval['rollover_alias'] = True
+        retval['ilm'] = self.define_ilm(phase, subtype)
+        retval['type'] = 'data_stream' if subtype == 'data_stream' else 'indices'
+        return retval
