@@ -205,6 +205,7 @@ class TestBed:
         Setup each EntityMgr child class
         """
         kw = {'client': self.client, 'plan': self.plan}
+
         self.ilmmgr = IlmMgr(**kw)
         self.ilmmgr.setup()
         self.componentmgr = ComponentMgr(**kw)

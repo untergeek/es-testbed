@@ -1,6 +1,6 @@
 """Make classes easier to import here"""
 
-__version__ = '0.8.3'
+__version__ = '0.8.4'
 
 from es_testbed._base import TestBed
 from es_testbed._plan import PlanBuilder

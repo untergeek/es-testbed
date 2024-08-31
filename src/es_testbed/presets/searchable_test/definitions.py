@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from json import loads
 from es_client.helpers.utils import get_yaml
-from . import scenarios
+from .scenarios import Scenarios
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ def get_plan(scenario: str = None) -> dict:
     if not scenario:
         return retval
     retval['uniq'] = f'scenario-{scenario}'
+    scenarios = Scenarios()
     newvals = getattr(scenarios, scenario)
     ilm = {}
     if 'ilm' in newvals:

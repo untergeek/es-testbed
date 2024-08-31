@@ -16,6 +16,9 @@ REPONAME=testing
 LIMIT=30  # How many seconds to wait to obtain the credentials
 IMAGE=docker.elastic.co/elasticsearch/elasticsearch
 MEMORY=1GB  # The heap will be half of this
+JAVA_OPTS="-Xms512m -Xmx512m"
+CLUSTER_NAME="docker_test"
+DISCOVERY_TYPE="single-node"
 
 
 #############################
@@ -25,6 +28,34 @@ MEMORY=1GB  # The heap will be half of this
 docker_logline () {
   # Return the line number that contains "${1}"
   echo $(docker logs ${NAME} | grep -n "${1}" | awk -F\: '{print $1}')
+}
+
+initial_value () {
+  # $1 is the value representation
+  local searchstr=''
+
+  case ${1} in
+    
+    'password') 
+      searchstr='elasticsearch-reset-password'
+      ;;
+
+    'nodetoken') 
+      searchstr='\--enrollment-token'
+      ;;
+
+  esac
+
+  local linenum=$(docker_logline ${searchstr})
+
+  # Increment the linenum (because we want the next line)
+  ((++linenum))
+
+  # Get the (next) line, i.e. incremented and tailed to isolate
+  retval=$(docker logs ${NAME} | head -n ${linenum} | tail -1 | awk '{print $1}')
+
+  # Strip the ANSI color/bold here. External function because of the control-M sequence
+  ansi_clean "${retval}"
 }
 
 get_espw () {
@@ -74,14 +105,8 @@ get_espw () {
     exit 1
   fi
   
-  # Increment the linenum (because we want the next line)
-  ((++linenum))
-
-  # Get the (next) line, i.e. incremented and tailed to isolate
-  retval=$(docker logs ${NAME} | head -n ${linenum} | tail -1 | awk '{print $1}')
-
-  # Strip the ANSI color/bold here. External function because of the control-M sequence
-  ESPWD=$(ansi_clean "${retval}")
+  ESPWD=$(initial_value 'password')
+  NODETOKEN=$(initial_value 'nodetoken')
 }
 
 change_espw () {
@@ -127,11 +152,9 @@ change_espw () {
 
 xpack_fork () {
 
-  echo
-  echo "Getting Elasticsearch credentials from container \"${NAME}\"..."
-  echo
+  echo "Getting Elasticsearch credentials from container ${NAME}..."
 
-  # Get the password from the change_espw function. It sets ESPWD
+  # Get the password from the get_espw function. It sets ESPWD
   get_espw 
 
   # If we have an empty value, that's a problem
@@ -143,6 +166,7 @@ xpack_fork () {
   # Put envvars in ${ENVCFG}
   echo "export ESCLIENT_USERNAME=${ESUSR}" >> ${ENVCFG}
   echo "export TEST_USER=${ESUSR}" >> ${ENVCFG}
+
   # We escape the quotes so we can include them in case of special characters
   echo "export ESCLIENT_PASSWORD=\"${ESPWD}\"" >> ${ENVCFG}
   echo "export TEST_PASS=\"${ESPWD}\"" >> ${ENVCFG}
@@ -156,7 +180,7 @@ xpack_fork () {
   echo "--cacert ${CACRT}" >> ${CURLCFG}
 
   # Complete
-  echo "Credentials captured!"
+  # echo "Credentials captured!"
 }
 
 # Save original execution path
@@ -206,11 +230,9 @@ CACRT=${PROJECT_ROOT}/http_ca.crt
 
 # Set the .env file
 ENVCFG=${PROJECT_ROOT}/${ENVFILE}
-rm -rf ${ENVCFG}
 
 # Set the curl config file and ensure we're not reusing an old one
 CURLCFG=${SCRIPTPATH}/${CURLFILE}
-rm -rf ${CURLCFG}
 
 # Determine local IPs
 OS=$(uname -a | awk '{print $1}')
@@ -229,8 +251,14 @@ fi
 ### Set Docker vars ###
 #######################
 
+# Set the TRUNK
+TRUNK=${PROJECT_NAME}-test
+
+# Set the Docker container number
+NUM=0
+
 # Set the Docker container name
-NAME=${PROJECT_NAME}-test
+NAME=${TRUNK}-${NUM}
 
 # Set the bind mount path for the snapshot repository
 REPOLOCAL=${SCRIPTPATH}/repo
@@ -238,6 +266,98 @@ REPOLOCAL=${SCRIPTPATH}/repo
 # Navigate back to the script path
 cd ${SCRIPTPATH}
 
-###################
+############################
+### URL CHECKER FUNCTION ###
+############################
+
+check_url () {
+
+  # URL = $1
+  # EXPECTED = $2
+
+  if [ "x${EXPECTED}" == "x" ]; then
+    local EXPECTED=200
+  else
+    local EXPECTED=${2}
+  fi
+
+  # Start with an empty value
+  local ACTUAL=0
+
+  # Initialize loop counter
+  local COUNTER=0
+
+  # Loop until we get our 200 code
+  while [ "${ACTUAL}" != "${EXPECTED}" ] && [ ${COUNTER} -lt ${LIMIT} ]; do
+
+    # Get our actual response
+    ACTUAL=$(curl -K ${CURLCFG} ${1})
+
+    # If we got what we expected, we're great!
+    if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+      # Sleep and try again
+      sleep 1
+      ((++COUNTER))
+    fi
+
+  done
+  # End while loop
+
+  # If we still don't have what we expected, we hit the LIMIT
+  if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+
+    echo "Unable to connect to ${1} in ${LIMIT} seconds. Unable to continue. Exiting..."
+    exit 1
+  fi
+
+  echo ${ACTUAL}
+}
+
+################################
+### Start a Docker container ###
+################################
+
+start_container () {
+  # $1 node_number
+  # $2 enrollment_token
+  # $3 node roles
+
+  if [ "x${2}" == "x" ]; then
+    local token=''
+  else
+    local token=${2}
+  fi
+
+  if [ "x${3}" == "x" ]; then
+    local roles="'data', 'data_cold', 'data_content', 'data_hot', 'data_warm', 'ingest', 'master'"
+  else
+    local roles="${3}"
+  fi
+
+  local fromzero=$(( ${1} - 1 ))
+  local nodename="${TRUNK}-${fromzero}"
+  local portnum=$(( 9200 + ${fromzero} ))
+
+echo -en "Container ID: "
+docker run -q -d -it \
+  --name ${nodename} \
+  --network ${TRUNK}-net \
+  -m ${MEMORY} \
+  -p ${portnum}:${DOCKER_PORT} \
+  -v ${REPOLOCAL}:${REPODOCKER} \
+  -e ENROLLMENT_TOKEN="${token}" \
+  -e ES_JAVA_OPTS="${JAVA_OPTS}" \
+  -e "discovery.type=${DISCOVERY_TYPE}" \
+  -e "cluster.name=${CLUSTER_NAME}" \
+  -e "node.name=node-${fromzero}" \
+  -e "node.roles=[${roles}]" \
+  -e "xpack.searchable.snapshot.shared_cache.size=100MB" \
+  -e "xpack.monitoring.templates.enabled=false" \
+  -e "path.repo=${REPODOCKER}" \
+${IMAGE}:${VERSION}
+
+}
+
+##################
 ### END COMMON ###
-###################
+##################
