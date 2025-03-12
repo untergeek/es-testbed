@@ -20,9 +20,9 @@ class PlanBuilder:
         if settings is None:
             raise ValueError('Must provide a settings dictionary')
         self.settings = settings
-        logger.debug('SETTINGS: %s', settings)
+        logger.debug(f'SETTINGS: {settings}')
         self._plan = DotMap(TESTPLAN)
-        logger.debug('INITIAL PLAN: %s', prettystr(self._plan))
+        logger.debug(f'INITIAL PLAN: {prettystr(self._plan)}')
         self._plan.cleanup = 'UNSET'  # Future use?
         if autobuild:
             self.setup()
@@ -107,7 +107,7 @@ class PlanBuilder:
         self.update_rollover_alias()
         logger.debug('Rollover alias updated')
         self.update_ilm()
-        logger.debug('FINAL PLAN: %s', prettystr(self._plan.toDict()))
+        logger.debug(f'FINAL PLAN: {prettystr(self._plan.toDict())}')
 
     def update(self, settings: t.Dict) -> None:
         """Update the Plan DotMap"""
@@ -148,8 +148,8 @@ class PlanBuilder:
                 if 'searchable' in entity and entity['searchable'] is not None:
                     if not entity['searchable'] in ilm.phases:
                         ilm.phases.append(entity['searchable'])
-            logger.debug('ILM = %s', ilm)
-            logger.debug('self._plan.ilm = %s', self._plan.ilm)
+            logger.debug(f'ILM = {ilm}')
+            logger.debug(f'self._plan.ilm = {self._plan.ilm}')
             kwargs = {
                 'phases': ilm.phases,
                 'forcemerge': ilm.forcemerge,
@@ -157,7 +157,7 @@ class PlanBuilder:
                 'readonly': ilm.readonly,
                 'repository': self._plan.repository,
             }
-            logger.debug('KWARGS = %s', kwargs)
+            logger.debug(f'KWARGS = {kwargs}')
             self._plan.ilm.policy = build_ilm_policy(**kwargs)
 
     def update_rollover_alias(self) -> None:

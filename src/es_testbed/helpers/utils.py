@@ -210,18 +210,17 @@ def process_preset(
             raise_on_none(**kw)
             trygit = True  # We have all 3 kwargs necessary for git
         except ValueError as resp:  # Not able to do a git preset
-            logger.debug('Unable to import a git-based preset: %s', resp)
+            logger.debug(f'Unable to import a git-based preset: {resp}')
         if trygit:  # Trying a git import
             tmpdir = mkdtemp()
             try:
                 _ = Repo.clone_from(url, tmpdir, branch=ref, depth=1)
                 filepath = Path(tmpdir) / path
             except Exception as err:
-                logger.error('Git clone failed: %s', err)
+                logger.error(f'Git clone failed: {err}')
                 rmtree(tmpdir)  # Clean up after failed attempt
                 raise err
-        if path:
-            filepath = Path(path)
+        filepath = Path(path)  # It should work even if path is None
         if not filepath.resolve().is_dir():
             raise ValueError(f'The provided path "{path}" is not a directory')
         modpath = filepath.resolve().name  # The final dirname

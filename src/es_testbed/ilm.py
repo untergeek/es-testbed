@@ -107,8 +107,8 @@ class IlmTracker:
         return list(self._phases.keys())
 
     def _log_phase(self, phase: str) -> None:
-        logger.debug('ILM Explain Index: %s', self._explain.index)
-        logger.info('Index "%s" now on phase "%s"', self.name, phase)
+        logger.debug(f'ILM Explain Index: {self._explain.index}')
+        logger.info(f'Index "{self.name}" now on phase "{phase}"')
 
     def _phase_wait(
         self, phase: str, pause: float = PAUSE_VALUE, timeout: float = TIMEOUT_VALUE
@@ -131,9 +131,9 @@ class IlmTracker:
         if self._explain.phase == 'delete':
             logger.warning('Already on "delete" phase. No more phases to advance')
         else:
-            logger.debug('current_step: %s', prettystr(self.current_step))
+            logger.debug(f'current_step: {prettystr(self.current_step)}')
             next_step = self.next_step(phase, action=action, name=name)
-            logger.debug('next_step: %s', prettystr(next_step))
+            logger.debug(f'next_step: {prettystr(next_step)}')
             if self._explain.phase == 'new' and phase == 'hot':
                 # It won't be for very long.
                 self._phase_wait('hot')
@@ -162,16 +162,13 @@ class IlmTracker:
 
                 if wait4steps:
                     self.update()
-                    logger.debug(
-                        'Waiting for "%s" phase steps to complete...',
-                        phase,
-                    )
+                    logger.debug(f'Waiting for "{phase}" phase steps to complete...')
                     self.wait4complete()
                     self.update()
                 self._log_phase(phase)
             else:
                 logger.error('next_step is a None value')
-                logger.error('current_step: %s', prettystr(self.current_step))
+                logger.error(f'current_step: {prettystr(self.current_step)}')
 
     def get_explain_data(self) -> t.Dict:
         """Get the ILM explain data and return it"""
@@ -243,11 +240,11 @@ class IlmTracker:
         step_name = bool(self._explain.name == 'complete')
         if bool(step_action and step_name):
             logger.debug(
-                '%s: Current step complete: %s', self.name, prettystr(self.current_step)
+                f'{self.name}: Current step complete: {prettystr(self.current_step)}'
             )
             return
         logger.debug(
-            '%s: Current step not complete. %s', self.name, prettystr(self.current_step)
+            f'{self.name}: Current step not complete. {prettystr(self.current_step)}'
         )
         kw = {'name': self.name, 'pause': PAUSE_VALUE, 'timeout': TIMEOUT_VALUE}
         step = IlmStep(self.client, **kw)
@@ -255,11 +252,11 @@ class IlmTracker:
             step.wait()
             logger.debug('ILM Step successful. The wait is over')
         except KeyError as exc:
-            logger.error('KeyError: The index name has changed: %s', prettystr(exc))
+            logger.error(f'KeyError: The index name has changed: {prettystr(exc)}')
             raise exc
         except BadRequestError as exc:
             logger.error('Index not found')
             raise exc
         except IlmWaitError as exc:
-            logger.error('Other IlmWait error encountered: %s', prettystr(exc))
+            logger.error(f'Other IlmWait error encountered: {prettystr(exc)}')
             raise exc

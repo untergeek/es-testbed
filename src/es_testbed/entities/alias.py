@@ -32,14 +32,13 @@ class Alias(Entity):
         for idx, alias in enumerate(res['aliases']):
             if alias['name'] == self.name:
                 logger.debug(
-                    'Confirm list index position [%s] match of alias %s',
-                    idx,
-                    prettystr(alias),
+                    f'Confirm list index position [{idx}] match of alias '
+                    f'{prettystr(alias)}'
                 )
             else:
                 continue
             if alias['indices'] == index_list:
-                logger.debug('Confirm match of indices backed by alias %s', self.name)
+                logger.debug(f'Confirm match of indices backed by alias {self.name}')
                 retval = True
                 break
         return retval

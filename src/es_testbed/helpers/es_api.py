@@ -169,17 +169,17 @@ def delete(
             else:
                 res = func(name=name)
         except NotFoundError as err:
-            logger.warning('%s named %s not found: %s', kind, name, prettystr(err))
+            logger.warning(f'{kind} named {name} not found: {prettystr(err)}')
             success = True
         except Exception as err:
             raise ResultNotExpected(f'Unexpected result: {prettystr(err)}') from err
         if 'acknowledged' in res and res['acknowledged']:
             success = True
-            logger.info('Deleted %s: "%s"', which['plural'], name)
+            logger.info(f'Deleted {which["plural"]}: "{name}"')
         else:
             success = verify(client, kind, name, repository=repository)
     else:
-        logger.debug('"%s" has a None value for name', kind)
+        logger.debug(f'"{kind}" has a None value for name')
     return success
 
 
@@ -289,7 +289,7 @@ def get(
     try:
         result = func(**kwargs)
     except NotFoundError:
-        logger.debug('%s pattern "%s" had zero matches', kind, pattern)
+        logger.debug(f'{kind} pattern "{pattern}" had zero matches')
         return []
     except Exception as err:
         raise ResultNotExpected(f'Unexpected result: {prettystr(err)}') from err
@@ -393,7 +393,7 @@ def ilm_explain(client: 'Elasticsearch', name: str) -> t.Union[t.Dict, None]:
         new = list(client.ilm.explain_lifecycle(index=name)['indices'].keys())[0]
         retval = client.ilm.explain_lifecycle(index=new)['indices'][new]
     except NotFoundError as err:
-        logger.warning('Datastream/Index Name changed. %s was not found', name)
+        logger.warning(f'Datastream/Index Name changed. {name} was not found')
         raise NameChanged(f'{name} was not found, likely due to a name change') from err
     except Exception as err:
         msg = f'Unable to get ILM information for index {name}'
@@ -497,6 +497,6 @@ def snapshot_name(client: 'Elasticsearch', name: str) -> t.Union[t.AnyStr, None]
     try:
         retval = res['store']['snapshot']['snapshot_name']
     except KeyError:
-        logger.error('%s is not a searchable snapshot')
+        logger.error(f'{name} is not a searchable snapshot')
         retval = None
     return retval

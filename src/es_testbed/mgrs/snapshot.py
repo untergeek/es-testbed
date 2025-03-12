@@ -31,9 +31,9 @@ class SnapshotMgr(EntityMgr):
         logger.info(msg)
         do_snap(self.client, self.plan.repository, self.name, index, tier=tier)
         self.appender(self.name)
-        logger.info('Successfully created snapshot "%s"', self.last)
+        logger.info(f'Successfully created snapshot "{self.last}"')
 
     def add_existing(self, name: str) -> None:
         """Add a snapshot that's already been created, e.g. by ILM promotion"""
-        logger.info('Adding snapshot %s to list...', name)
+        logger.info(f'Adding snapshot {name} to list...')
         self.appender(name)

@@ -62,7 +62,7 @@ class IndexMgr(EntityMgr):
 
     def add(self, value) -> None:
         """Create a single index"""
-        logger.debug('Creating index: "%s"', value)
+        logger.debug(f'Creating index: "{value}"')
         create_index(self.client, value)
 
     def add_indices(self) -> None:
@@ -82,12 +82,12 @@ class IndexMgr(EntityMgr):
                 options=scheme['options'],
             )
             self.track_index(self.name)
-        logger.debug('Created indices: %s', prettystr(self.indexlist))
+        logger.debug(f'Created indices: {prettystr(self.indexlist)}')
         if self.plan.rollover_alias:
             if not self.alias.verify(self.indexlist):
                 logger.error(
-                    'Unable to confirm rollover of alias "%s" was successful',
-                    self.plan.rollover_alias,
+                    f'Unable to confirm rollover of alias '
+                    f'"{self.plan.rollover_alias}" was successful'
                 )
 
     def searchable(self) -> None:
@@ -99,21 +99,21 @@ class IndexMgr(EntityMgr):
     def setup(self) -> None:
         """Setup the entity manager"""
         logger.debug('Beginning setup...')
-        logger.debug('PLAN: %s', prettystr(self.plan.toDict()))
+        logger.debug(f'PLAN: {prettystr(self.plan.toDict())}')
         if self.plan.rollover_alias:
             logger.debug('rollover_alias is True...')
         self.add_indices()
         self.searchable()
-        logger.info('Successfully created indices: %s', prettystr(self.indexlist))
+        logger.info(f'Successfully created indices: {prettystr(self.indexlist)}')
 
     def track_alias(self) -> None:
         """Track a rollover alias"""
-        logger.debug('Tracking alias: %s', self.plan.rollover_alias)
+        logger.debug(f'Tracking alias: {self.plan.rollover_alias}')
         self.alias = Alias(client=self.client, name=self.plan.rollover_alias)
 
     def track_index(self, name: str) -> None:
         """Track an index and append that tracking entity to entity_list"""
-        logger.debug('Tracking index: %s', name)
+        logger.debug(f'Tracking index: {name}')
         entity = Index(
             client=self.client,
             name=name,

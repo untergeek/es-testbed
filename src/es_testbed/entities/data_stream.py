@@ -34,6 +34,6 @@ class DataStream(Alias):
         """Verify that the backing indices match ``index_list``"""
         retval = False
         if self.backing_indices == index_list:
-            logger.debug('Confirm match of data_stream "%s" backing indices', self.name)
+            logger.debug(f'Confirm match of data_stream "{self.name}" backing indices')
             retval = True
         return retval
