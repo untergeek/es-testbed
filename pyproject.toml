@@ -33,8 +33,8 @@ keywords = [
 dependencies = [
     'gitpython==3.1.43',
     'dotmap==1.3.30',
-    'es_client>=8.15.1',
-    'es-wait>=0.8.0',
+    'es_client>=8.17.3',
+    'es-wait>=0.10.0',
 ]
 
 [project.optional-dependencies]
@@ -137,6 +137,9 @@ exclude = [
     'tests',
     'pytest.ini',
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/es_testbed"]
 
 [tool.hatch.envs.test]
 dependencies = [
