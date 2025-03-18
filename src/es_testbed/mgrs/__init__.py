@@ -1,11 +1,11 @@
-"""Make class import nicer"""
+"""Module to make class imports nicer for the mgrs package."""
 
-from es_testbed.mgrs.component import ComponentMgr
-from es_testbed.mgrs.data_stream import DataStreamMgr
-from es_testbed.mgrs.ilm import IlmMgr
-from es_testbed.mgrs.index import IndexMgr
-from es_testbed.mgrs.snapshot import SnapshotMgr
-from es_testbed.mgrs.template import TemplateMgr
+from .component import ComponentMgr
+from .data_stream import DataStreamMgr
+from .ilm import IlmMgr
+from .index import IndexMgr
+from .snapshot import SnapshotMgr
+from .template import TemplateMgr
 
 __all__ = [
     'ComponentMgr',

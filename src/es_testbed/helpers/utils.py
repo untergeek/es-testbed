@@ -5,7 +5,7 @@ import typing as t
 import random
 import string
 import logging
-from datetime import datetime, timezone
+import datetime
 from pathlib import Path
 from pprint import pformat
 from shutil import rmtree
@@ -71,41 +71,6 @@ def build_ilm_policy(
     return {'phases': retval}
 
 
-# def doc_gen(
-#     count: int = 10, start_at: int = 0, match: bool = True
-# ) -> t.Generator[t.Dict, None, None]:
-#     """Create this doc for each count"""
-#     keys = ['message', 'nested', 'deep']
-#     # Start with an empty map
-#     matchmap = {}
-#     # Iterate over each key
-#     for key in keys:
-#         # If match is True
-#         if match:
-#             # Set matchmap[key] to key
-#             matchmap[key] = key
-#         else:
-#             # Otherwise matchmap[key] will have a random string value
-#             matchmap[key] = randomstr()
-
-#     # This is where count and start_at matter
-#     for num in range(start_at, start_at + count):
-#         yield {
-#             '@timestamp': iso8601_now(),
-#             'message': f'{matchmap["message"]}{num}',  # message# or randomstr#
-#             'number': (
-#                 num if match else random.randint(1001, 32767)
-#             ),  # value of num or random int
-#             'nested': {'key': f'{matchmap["nested"]}{num}'},  # nested#
-#             'deep': {'l1': {'l2': {'l3': f'{matchmap["deep"]}{num}'}}},  # deep#
-#         }
-
-
-# def getlogger(name: str) -> logging.getLogger:
-#     """Return a named logger"""
-#     return logging.getLogger(name)
-
-
 def get_routing(tier='hot') -> t.Dict:
     """Return the routing allocation tier preference"""
     try:
@@ -138,8 +103,7 @@ def iso8601_now() -> str:
     #
     # We are MANUALLY, FORCEFULLY declaring timezone.utc, so it should ALWAYS be
     # +00:00, but could in theory sometime show up as a Z, so we test for that.
-
-    parts = datetime.now(timezone.utc).isoformat().split('+')
+    parts = datetime.datetime.now(datetime.timezone.utc).isoformat().split('+')
     if len(parts) == 1:
         if parts[0][-1] == 'Z':
             return parts[0]  # Our ISO8601 already ends with a Z for Zulu/UTC time

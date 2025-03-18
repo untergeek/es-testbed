@@ -24,7 +24,7 @@ if t.TYPE_CHECKING:
 
 logger = logging.getLogger('es_testbed.TestBed')
 
-# pylint: disable=R0902,R0913
+# pylint: disable=R0902,R0913,R0917
 
 # Preset Import
 # This imports the preset directory which must include the following files:
@@ -52,12 +52,12 @@ class TestBed:
 
     def __init__(
         self,
-        client: 'Elasticsearch' = None,
-        builtin: t.Union[str, None] = None,
-        path: t.Union[str, None] = None,
-        ref: t.Union[str, None] = None,
-        url: t.Union[str, None] = None,
-        scenario: t.Union[str, None] = None,
+        client: t.Optional['Elasticsearch'] = None,
+        builtin: t.Optional[str] = None,
+        path: t.Optional[str] = None,
+        ref: t.Optional[str] = None,
+        url: t.Optional[str] = None,
+        scenario: t.Optional[str] = None,
     ):
         #: The plan settings
         self.settings = None
@@ -99,11 +99,6 @@ class TestBed:
         self.indexmgr = None
         #: The data_stream entity manager
         self.data_streammgr = None
-
-        # At this point, we have an imported preset. If we need to tweak the plan, we
-        # just overwrite the values in the plan. We have the ILM settings, the
-        # index_buildlist, etc. We can update/change whatever we want right up until we
-        # call .setup()
 
     def _erase(self, kind: str, lst: t.Sequence[str]) -> None:
         overall_success = True

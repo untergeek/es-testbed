@@ -24,6 +24,7 @@ class Alias(Entity):
         super().__init__(client=client, name=name)
 
     def rollover(self) -> None:
+        """Rollover the alias"""
         rollover(self.client, self.name)
 
     def verify(self, index_list: t.Sequence[str]) -> bool:

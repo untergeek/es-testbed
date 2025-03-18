@@ -10,13 +10,92 @@ logger = logging.getLogger(__name__)
 
 
 class PlanBuilder:
-    """Plan builder class"""
+    """
+    Plan builder class
+
+    """
 
     def __init__(
         self,
-        settings: t.Dict = None,
+        settings: t.Dict,
         autobuild: t.Optional[bool] = True,
     ):
+        """Class initializer
+
+        Receives a settings dictionary and builds the object based on it. This
+        dictionary is converted into a DotMap object to make it easier to access
+        and modify the settings.
+
+        The settings dictionary should have the following structure:
+
+        .. code-block:: python
+
+           {
+               'type': 'indices',       # indices or data_streams
+               'prefix': 'es-testbed',  # The default prefix for everything we create
+               'rollover_alias': False, # Only respected if 'type' == 'indices'.
+                                        # Will rollover after creation and filling 1st
+                                        # If True, will be overridden to value of alias
+                                        # If False, will be overridden with None
+               'uniq': 'my-unique-str', # If not provided, randomstr()
+               'repository':            # Only used for cold/frozen tier for snapshots
+               'ilm': {                 # All of these ILM values are defaults
+                   'enabled': False,
+                   'phases': ['hot', 'delete'],
+                   'readonly': PHASE      # Define readonly action during named PHASE
+                   'forcemerge': False,
+                   'max_num_segments': 1,
+                   'policy': {}           # Define full ILM policy in advance.
+               },
+               'index_buildlist': [],   # List of indices to create
+           }
+
+        The index_buildlist is a list of dictionaries, each with a similar structure:
+
+        .. code-block:: python
+
+           'index_buildlist': [
+               {
+                 'preset': 'NAME',         # docgen_preset name, included or otherwise
+                 'options': {              # kwargs for the generator function
+                   'docs': 10,
+                   'start_at': 0,
+                   'match': True,
+                 }
+                 'target_tier': 'frozen'   # Target tier for 1st (oldest) index created
+               },
+               {
+                 'preset': 'NAME',         # docgen_preset name, included or otherwise
+                 'options': {              # kwargs for the generator function
+                   'docs': 10,
+                   'start_at': 10,
+                   'match': True,
+                 }
+                 'target_tier': 'cold'     # Target tier for 2nd index created
+               },
+               {
+                 'preset': 'NAME',         # docgen_preset name, included or otherwise
+                 'options': {              # kwargs for the generator function
+                   'docs': 10,
+                   'start_at': 20,
+                   'match': True,
+                 }
+                 'target_tier': 'hot'      # Target tier for last (newest) index created
+               },
+           ]
+
+        The index_buildlist can be provided after the object is created, and is,
+        in fact, if using a preset, which will provide the entire plan, including
+        the index_buildlist, and the values that need to go in the indices.
+
+        Args:
+            settings (t.Dict): The settings dictionary
+            autobuild (t.Optional[bool], optional): Whether to autobuild the plan.
+                Defaults to True.
+
+        Raises:
+            ValueError: Must provide a settings dictionary
+        """
         if settings is None:
             raise ValueError('Must provide a settings dictionary')
         self.settings = settings
@@ -26,61 +105,6 @@ class PlanBuilder:
         self._plan.cleanup = 'UNSET'  # Future use?
         if autobuild:
             self.setup()
-
-        # ## Example settings
-        # {
-        #   'type': 'indices',       # Default is indices? Or should it be data_streams?
-        #   'prefix': 'es-testbed',  # The default prefix for everything we create
-        #   'rollover_alias': False, # Only respected if 'type' == 'indices'.
-        #                            # Will rollover after creation and filling 1st
-        #                            # If True, will be overridden to value of alias
-        #                            # If False, will be overridden with None
-        #   'uniq': 'my-unique-str', # If not provided, randomstr()
-        #   'repository':            # Only used for cold/frozen tier for snapshots
-        #   'ilm': {                 # All of these ILM values are defaults
-        #     'enabled': False,
-        #     'phases': ['hot', 'delete'],
-        #     'readonly': PHASE      # Define readonly action during named PHASE
-        #     'forcemerge': False,
-        #     'max_num_segments': 1,
-        #     'policy': {}           # Define full ILM policy in advance.
-        #   }
-        #
-
-        #
-        # # The index_buildlist
-        # # The array of indices to build. Needs at least a single element. Importing
-        # # is expected, but it can be modified or replaced after importing.
-        #   'index_buildlist': [
-        #    {
-        #      'preset': 'NAME',         # docgen_preset name, included or otherwise
-        #      'options': {              # kwargs for the generator function
-        #        'docs': 10,
-        #        'start_at': 0,
-        #        'match': True,
-        #      }
-        #      'target_tier': 'frozen'   # Target tier for 1st (oldest) index created
-        #    },
-        #    {
-        #      'preset': 'NAME',         # docgen_preset name, included or otherwise
-        #      'options': {              # kwargs for the generator function
-        #        'docs': 10,
-        #        'start_at': 10,
-        #        'match': True,
-        #      }
-        #      'target_tier': 'cold'     # Target tier for 2nd index created
-        #    },
-        #    {
-        #      'preset': 'NAME',         # docgen_preset name, included or otherwise
-        #      'options': {              # kwargs for the generator function
-        #        'docs': 10,
-        #        'start_at': 20,
-        #        'match': True,
-        #      }
-        #      'target_tier': 'hot'      # Target tier for last (newest) index created
-        #    },
-        #   ]
-        # }
 
     @property
     def plan(self) -> DotMap:
@@ -111,7 +135,7 @@ class PlanBuilder:
 
     def update(self, settings: t.Dict) -> None:
         """Update the Plan DotMap"""
-        self._plan.update(**settings)
+        self._plan.update(DotMap(settings))
 
     def update_ilm(self) -> None:
         """Update the ILM portion of the Plan DotMap"""

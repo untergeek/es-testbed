@@ -24,9 +24,9 @@ class IndexMgr(EntityMgr):
 
     def __init__(
         self,
-        client: t.Union['Elasticsearch', None] = None,
-        plan: t.Union['DotMap', None] = None,
-        snapmgr: t.Union[SnapshotMgr, None] = None,
+        client: t.Optional['Elasticsearch'] = None,
+        plan: t.Optional['DotMap'] = None,
+        snapmgr: t.Optional[SnapshotMgr] = None,
     ):
         self.snapmgr = snapmgr
         self.alias = None  # Only used for tracking the rollover alias
@@ -48,11 +48,7 @@ class IndexMgr(EntityMgr):
         """This is the execution path for rollover indices"""
         if not self.entity_list:
             acfg = {self.plan.rollover_alias: {'is_write_index': True}}
-            msg = 'No indices created yet. Starting with a rollover alias index...'
-            logger.debug(msg)
             create_index(self.client, self.name, aliases=acfg)
-            msg = f'Created {self.name} with rollover alias {self.plan.rollover_alias}'
-            logger.debug(msg)
             self.track_alias()
         else:
             self.alias.rollover()

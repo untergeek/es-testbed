@@ -33,8 +33,8 @@ keywords = [
 dependencies = [
     'gitpython==3.1.43',
     'dotmap==1.3.30',
-    'es_client>=8.17.3',
-    'es-wait>=0.10.0',
+    'es_client>=8.17.4',
+    'es-wait>=0.11.0',
 ]
 
 [project.optional-dependencies]
@@ -149,6 +149,15 @@ dependencies = [
     'pytest >=7.2.1',
     'pytest-cov',
     'pytest-dotenv',
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src/es_testbed"]
+minversion = "7.2"
+addopts = "-ra -q"
+testpaths = [
+    "tests/unit",
+    "tests/integration",
 ]
 
 [publish.index.repos.main]

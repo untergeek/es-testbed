@@ -1,5 +1,6 @@
 """Searchable Snapshot Test Built-in Plan"""
 
+import typing as t
 import logging
 from pathlib import Path
 from json import loads
@@ -19,21 +20,18 @@ def buildlist() -> list:
     return get_yaml((modpath() / 'buildlist.yml'))
 
 
-def get_plan(scenario: str = None) -> dict:
+def get_plan(scenario: t.Optional[str] = None) -> dict:
     """Return the plan dict based on scenario"""
     retval = baseplan()
     retval.update(buildlist())
-    if not scenario:
-        return retval
-    retval['uniq'] = f'scenario-{scenario}'
-    scenarios = Scenarios()
-    newvals = getattr(scenarios, scenario)
-    ilm = {}
-    if 'ilm' in newvals:
-        ilm = newvals.pop('ilm')
-    if ilm:
-        retval['ilm'].update(ilm)
-    retval.update(newvals)
+    if scenario:
+        retval['uniq'] = f'scenario-{scenario}'
+        scenarios = Scenarios()
+        newvals = getattr(scenarios, scenario)
+        ilm = newvals.pop('ilm', {})
+        if ilm:
+            retval['ilm'].update(ilm)
+        retval.update(newvals)
     return retval
 
 

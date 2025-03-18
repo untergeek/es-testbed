@@ -3,15 +3,15 @@
 import typing as t
 import logging
 from os import getenv
-from elasticsearch8.exceptions import NotFoundError
+from elasticsearch8.exceptions import NotFoundError, TransportError
 from es_wait import Exists, Snapshot
+from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
 from ..defaults import MAPPING, PAUSE_DEFAULT, PAUSE_ENVVAR
 from ..exceptions import (
     NameChanged,
     ResultNotExpected,
     TestbedFailure,
     TestbedMisconfig,
-    TimeoutException,
 )
 from ..helpers.utils import (
     get_routing,
@@ -89,26 +89,51 @@ def emap(kind: str, es: 'Elasticsearch', value=None) -> t.Dict[str, t.Any]:
     return _[kind]
 
 
-def change_ds(client: 'Elasticsearch', actions: t.Union[str, None] = None) -> None:
-    """Change/Modify/Update a datastream"""
+def change_ds(client: 'Elasticsearch', actions: t.Optional[str] = None) -> None:
+    """Change/Modify/Update a data_stream"""
     try:
         client.indices.modify_data_stream(actions=actions, body=None)
     except Exception as err:
         raise ResultNotExpected(
-            f'Unable to modify datastreams. {prettystr(err)}'
+            f'Unable to modify data_streams. {prettystr(err)}'
         ) from err
+
+
+# pylint: disable=R0913,R0917
+def wait_wrapper(
+    client: 'Elasticsearch',
+    wait_cls: t.Callable,
+    wait_kwargs: t.Dict,
+    func: t.Callable,
+    f_kwargs: t.Dict,
+) -> None:
+    """Wrapper function for waiting on an object to be created"""
+    try:
+        func(**f_kwargs)
+        test = wait_cls(client, **wait_kwargs)
+        test.wait()
+    except EsWaitFatal as wait:
+        msg = f'{wait.message}. Elapsed time: {wait.elapsed}. Errors: {wait.errors}'
+        raise TestbedFailure(msg) from wait
+    except EsWaitTimeout as wait:
+        msg = f'{wait.message}. Elapsed time: {wait.elapsed}. Timeout: {wait.timeout}'
+        raise TestbedFailure(msg) from wait
+    except TransportError as err:
+        raise TestbedFailure(
+            f'Elasticsearch TransportError class exception encountered:'
+            f'{prettystr(err)}'
+        ) from err
+    except Exception as err:
+        raise TestbedFailure(f'General Exception caught: {prettystr(err)}') from err
 
 
 def create_data_stream(client: 'Elasticsearch', name: str) -> None:
-    """Create a datastream"""
-    try:
-        client.indices.create_data_stream(name=name)
-        test = Exists(client, name=name, kind='data_stream', pause=PAUSE_VALUE)
-        test.wait()
-    except Exception as err:
-        raise TestbedFailure(
-            f'Unable to create datastream {name}. Error: {prettystr(err)}'
-        ) from err
+    """Create a data_stream"""
+    wait_kwargs = {'name': name, 'kind': 'data_stream', 'pause': PAUSE_VALUE}
+    f_kwargs = {'name': name}
+    wait_wrapper(
+        client, Exists, wait_kwargs, client.indices.create_data_stream, f_kwargs
+    )
 
 
 def create_index(
@@ -123,14 +148,14 @@ def create_index(
         settings = get_routing(tier=tier)
     else:
         settings.update(get_routing(tier=tier))
-    client.indices.create(
-        index=name, aliases=aliases, mappings=MAPPING, settings=settings
-    )
-    try:
-        test = Exists(client, name=name, kind='index', pause=PAUSE_VALUE)
-        test.wait()
-    except TimeoutException as err:
-        raise ResultNotExpected(f'Failed to create index {name}') from err
+    wait_kwargs = {'name': name, 'kind': 'index', 'pause': PAUSE_VALUE}
+    f_kwargs = {
+        'index': name,
+        'aliases': aliases,
+        'mappings': MAPPING,
+        'settings': settings,
+    }
+    wait_wrapper(client, Exists, wait_kwargs, client.indices.create, f_kwargs)
     return exists(client, 'index', name)
 
 
@@ -138,11 +163,11 @@ def verify(
     client: 'Elasticsearch',
     kind: str,
     name: str,
-    repository: t.Union[str, None] = None,
+    repository: t.Optional[str] = None,
 ) -> bool:
     """Verify that whatever was deleted is actually deleted"""
     success = True
-    items = ','.split(name)
+    items = name.split(',')
     for item in items:
         result = exists(client, kind, item, repository=repository)
         if result:  # That means it's still in the cluster
@@ -154,7 +179,7 @@ def delete(
     client: 'Elasticsearch',
     kind: str,
     name: str,
-    repository: t.Union[str, None] = None,
+    repository: t.Optional[str] = None,
 ) -> bool:
     """Delete the named object of type kind"""
     which = emap(kind, client)
@@ -170,7 +195,7 @@ def delete(
                 res = func(name=name)
         except NotFoundError as err:
             logger.warning(f'{kind} named {name} not found: {prettystr(err)}')
-            success = True
+            return True
         except Exception as err:
             raise ResultNotExpected(f'Unexpected result: {prettystr(err)}') from err
         if 'acknowledged' in res and res['acknowledged']:
@@ -187,9 +212,9 @@ def do_snap(
     client: 'Elasticsearch', repo: str, snap: str, idx: str, tier: str = 'cold'
 ) -> None:
     """Perform a snapshot"""
-    client.snapshot.create(repository=repo, snapshot=snap, indices=idx)
-    test = Snapshot(client, snapshot=snap, repository=repo, pause=1, timeout=60)
-    test.wait()
+    wait_kwargs = {'snapshot': snap, 'repository': repo, 'pause': 1, 'timeout': 60}
+    f_kwargs = {'repository': repo, 'snapshot': snap, 'indices': idx}
+    wait_wrapper(client, Snapshot, wait_kwargs, client.snapshot.create, f_kwargs)
 
     # Mount the index accordingly
     client.searchable_snapshots.mount(
@@ -215,9 +240,18 @@ def exists(
     func = emap(kind, client)['exists']
     try:
         if kind == 'snapshot':
-            retval = func(snapshot=name, repository=repository)
+            # Expected response: {'snapshots': [{'snapshot': name, ...}]}
+            # Since we are specifying by name, there should only be one returned
+            res = func(snapshot=name, repository=repository)
+            logger.debug(f'Snapshot response: {res}')
+            # If there are no entries, load a default None value for the check
+            _ = dict(res['snapshots'][0]) if res else {'snapshot': None}
+            # Since there should be only 1 snapshot with this name, we can check it
+            retval = bool(_['snapshot'] == name)
         elif kind == 'ilm':
-            retval = func(name=name)
+            # There is no true 'exists' method for ILM, so we have to get the policy
+            # and check for a NotFoundError
+            retval = bool(name in dict(func(name=name)))
         elif kind in ['index', 'data_stream']:
             retval = func(index=name)
         else:
@@ -231,9 +265,9 @@ def exists(
 
 def fill_index(
     client: 'Elasticsearch',
-    name: t.Union[str, None] = None,
-    doc_generator: t.Union[t.Generator[t.Dict, None, None], None] = None,
-    options: t.Union[t.Dict, None] = None,
+    name: t.Optional[str] = None,
+    doc_generator: t.Optional[t.Generator[t.Dict, None, None]] = None,
+    options: t.Optional[t.Dict] = None,
 ) -> None:
     """
     Create and fill the named index with mappings and settings as directed
@@ -274,7 +308,7 @@ def get(
     client: 'Elasticsearch',
     kind: str,
     pattern: str,
-    repository: t.Union[str, None] = None,
+    repository: t.Optional[str] = None,
 ) -> t.Sequence[str]:
     """get any/all objects of type kind matching pattern"""
     if pattern is None:
@@ -329,7 +363,7 @@ def get_backing_indices(client: 'Elasticsearch', name: str) -> t.Sequence[str]:
 
 def get_ds_current(client: 'Elasticsearch', name: str) -> str:
     """
-    Find which index is the current 'write' index of the datastream
+    Find which index is the current 'write' index of the data_stream
     This is best accomplished by grabbing the last backing_index
     """
     backers = get_backing_indices(client, name)
@@ -416,45 +450,45 @@ def ilm_move(
             f'Error: {prettystr(err)}'
         )
         logger.critical(msg)
-        raise ResultNotExpected(msg, err)
+        raise ResultNotExpected(msg, (err,))
 
 
 def put_comp_tmpl(client: 'Elasticsearch', name: str, component: t.Dict) -> None:
     """Publish a component template"""
-    try:
-        client.cluster.put_component_template(
-            name=name, template=component, create=True
-        )
-        test = Exists(client, name=name, kind='component', pause=PAUSE_VALUE)
-        test.wait()
-    except Exception as err:
-        raise TestbedFailure(
-            f'Unable to create component template {name}. Error: {prettystr(err)}'
-        ) from err
+    wait_kwargs = {'name': name, 'kind': 'component_template', 'pause': PAUSE_VALUE}
+    f_kwargs = {'name': name, 'template': component, 'create': True}
+    wait_wrapper(
+        client,
+        Exists,
+        wait_kwargs,
+        client.cluster.put_component_template,
+        f_kwargs,
+    )
 
 
 def put_idx_tmpl(
-    client,
+    client: 'Elasticsearch',
     name: str,
-    index_patterns: list,
-    components: list,
-    data_stream: t.Union[t.Dict, None] = None,
+    index_patterns: t.List[str],
+    components: t.List[str],
+    data_stream: t.Optional[t.Dict] = None,
 ) -> None:
     """Publish an index template"""
-    try:
-        client.indices.put_index_template(
-            name=name,
-            composed_of=components,
-            data_stream=data_stream,
-            index_patterns=index_patterns,
-            create=True,
-        )
-        test = Exists(client, name=name, kind='template', pause=PAUSE_VALUE)
-        test.wait()
-    except Exception as err:
-        raise TestbedFailure(
-            f'Unable to create index template {name}. Error: {prettystr(err)}'
-        ) from err
+    wait_kwargs = {'name': name, 'kind': 'index_template', 'pause': PAUSE_VALUE}
+    f_kwargs = {
+        'name': name,
+        'composed_of': components,
+        'data_stream': data_stream,
+        'index_patterns': index_patterns,
+        'create': True,
+    }
+    wait_wrapper(
+        client,
+        Exists,
+        wait_kwargs,
+        client.indices.put_index_template,
+        f_kwargs,
+    )
 
 
 def put_ilm(
@@ -485,7 +519,7 @@ def resolver(client: 'Elasticsearch', name: str) -> dict:
 
 
 def rollover(client: 'Elasticsearch', name: str) -> None:
-    """Rollover alias or datastream identified by name"""
+    """Rollover alias or data_stream identified by name"""
     client.indices.rollover(alias=name, wait_for_active_shards='all')
 
 

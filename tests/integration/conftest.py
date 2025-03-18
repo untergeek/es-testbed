@@ -1,12 +1,13 @@
 """Top-level conftest.py"""
 
-# pylint: disable=missing-function-docstring,redefined-outer-name,R0913
+# pylint: disable=C0115,missing-function-docstring,redefined-outer-name,R0913
 import typing as t
-from os import environ
+from os import environ, path
 from datetime import datetime, timezone
 import random
 import string
 import pytest
+from dotenv import load_dotenv
 from elasticsearch8.exceptions import NotFoundError
 from es_client import Builder
 from es_client.helpers.logging import set_logging
@@ -15,6 +16,23 @@ from es_testbed.helpers.es_api import get_ds_current, get_write_index
 
 LOGLEVEL = 'DEBUG'
 LOCALREPO = 'testing'
+PROJ = path.abspath(path.join(path.dirname(__file__), '..'))
+ENVPATH = path.join(PROJ, '.env')
+print(f'ENVPATH: {ENVPATH}')
+
+
+class Index4Test:
+
+    def __init__(self, client, idx_name, idx_settings):
+        self.client = client
+        self.name = idx_name
+        self.settings = idx_settings
+
+    def setup(self):
+        self.client.indices.create(index=self.name, settings=self.settings)
+
+    def teardown(self):
+        self.client.indices.delete(index=self.name)
 
 
 @pytest.fixture(scope='class')
@@ -57,6 +75,7 @@ def actual_write_index(actual_rollover):
 @pytest.fixture(scope='session')
 def client():
     """Return an Elasticsearch client"""
+    load_dotenv(dotenv_path=ENVPATH)
     host = environ.get('TEST_ES_SERVER')
     user = environ.get('TEST_USER')
     pswd = environ.get('TEST_PASS')
@@ -97,6 +116,29 @@ def components(namecore):
     components.append(f'{namecore("component")}-000001')
     components.append(f'{namecore("component")}-000002')
     return components
+
+
+@pytest.fixture
+def name(request):
+    return request.param
+
+
+@pytest.fixture
+def idxcfg(request):
+    return request.param
+
+
+@pytest.fixture
+def create_idx(client, name, idxcfg):
+    # Setup
+    print(f'Creating index {name} with settings {idxcfg}')
+    index = Index4Test(client, name, idxcfg)
+    index.setup()
+    yield index
+
+    # Teardown
+    print(f'Teardown: Deleting index {name}')
+    index.teardown()
 
 
 def create_repository(client, name: str) -> None:
@@ -238,6 +280,7 @@ def randomstr(length: int = 16, lowercase: bool = False):
 @pytest.fixture(scope='class')
 def repo(client):
     """Return the elasticsearch repository"""
+    load_dotenv(dotenv_path=ENVPATH)
     name = environ.get('TEST_ES_REPO', 'found-snapshots')  # Going with Cloud default
     if not repo:
         return False
@@ -305,6 +348,7 @@ def skip_no_repo(repo) -> None:
 def skip_localhost() -> None:
     def _skip_localhost(skip_it: bool) -> None:
         if skip_it:
+            load_dotenv(dotenv_path=ENVPATH)
             host = environ.get('TEST_ES_SERVER')
             file = environ.get('ES_CLIENT_FILE', None)  # Path to es_client YAML config
             repo = environ.get('TEST_ES_REPO')

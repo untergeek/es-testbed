@@ -5,13 +5,14 @@ import logging
 from os import getenv
 from elasticsearch8.exceptions import BadRequestError
 from es_wait import Exists, IlmPhase, IlmStep
-from es_wait.exceptions import IlmWaitError
+from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
 from es_testbed.defaults import (
     PAUSE_DEFAULT,
     PAUSE_ENVVAR,
     TIMEOUT_DEFAULT,
     TIMEOUT_ENVVAR,
 )
+from es_testbed.exceptions import TestbedFailure
 from es_testbed.entities.entity import Entity
 from es_testbed.helpers.es_api import snapshot_name
 from es_testbed.helpers.utils import mounted_name, prettystr
@@ -85,36 +86,49 @@ class Index(Entity):
             self.client, pause=PAUSE_VALUE, timeout=TIMEOUT_VALUE, name=self.name
         )
         try:
-            step.wait()
-            logger.debug('ILM Step successful. The wait is over')
-        except KeyError as exc:
-            logger.error(f'KeyError: The index name has changed: "{exc}"')
-            raise exc
-        except BadRequestError as exc:
-            logger.error('Index not found')
-            raise exc
-        except IlmWaitError as exc:
-            logger.error(f'Other IlmWait error encountered: "{exc}"')
-            raise exc
+            self._wait_try(step.wait)
+        except TestbedFailure as err:
+            logger.error(err.message)
+            raise err
+
+    def _wait_try(self, func: t.Callable) -> None:
+        """Wait for an es-wait function to complete"""
+        try:
+            func()
+        except EsWaitFatal as wait:
+            # EsWaitFatal indicates we had more than the allowed number of exceptions
+            msg = f'{wait.message}. Elapsed time: {wait.elapsed}. Errors: {wait.errors}'
+            raise TestbedFailure(msg) from wait
+        except EsWaitTimeout as wait:
+            # EsWaitTimeout indicates we hit the timeout
+            msg = f'{wait.message}. Total elapsed time: {wait.elapsed}.'
+            raise TestbedFailure(msg) from wait
+        except Exception as err:
+            raise TestbedFailure(f'General Exception caught: {prettystr(err)}') from err
 
     def _mounted_step(self, target: str) -> str:
         try:
             self.ilm_tracker.advance(phase=target)
         except BadRequestError as err:
             logger.critical(f'err: {prettystr(err)}')
-            raise BadRequestError from err
+            raise err  # Re-raise after logging
         # At this point, it's "in" a searchable tier, but the index name hasn't
         # changed yet
         newidx = mounted_name(self.name, target)
         logger.debug(f'Waiting for ILM phase change to complete. New index: {newidx}')
-        kwargs = {
+        wait_kwargs = {
             'name': newidx,
             'kind': 'index',
             'pause': PAUSE_VALUE,
             'timeout': TIMEOUT_VALUE,
         }
-        test = Exists(self.client, **kwargs)
-        test.wait()
+
+        test = Exists(self.client, **wait_kwargs)
+        try:
+            self._wait_try(test.wait)
+        except TestbedFailure as err:
+            logger.error(err.message)
+            raise err
 
         # Update the name and run
         logger.debug(f'Updating self.name from "{self.name}" to "{newidx}"...')
@@ -128,7 +142,7 @@ class Index(Entity):
         logger.debug(f'Switching to track "{newidx}" as self.name...')
         self.track_ilm(newidx)
 
-    def manual_ss(self, scheme) -> None:
+    def manual_ss(self, scheme: t.Dict[str, t.Any]) -> None:
         """
         If we are NOT using ILM but have specified searchable snapshots in the plan
         entities
@@ -167,7 +181,11 @@ class Index(Entity):
                 name=self.name,
                 phase=self.ilm_tracker.next_phase,
             )
-            phasenext.wait()
+            try:
+                self._wait_try(phasenext.wait)
+            except TestbedFailure as err:
+                logger.error(err.message)
+                raise err
         target = self._get_target
         if current != target:
             logger.debug(f'Current ({current}) and target ({target}) mismatch')

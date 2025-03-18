@@ -5,9 +5,20 @@ import pytest
 from es_testbed import TestBed
 from es_testbed.presets.searchable_test.definitions import get_plan
 
-logger = logging.getLogger(__name__)
+INDEX1: str = 'index1'
+"""Default index name for testing."""
 
-# pylint: disable=R0913
+SETTINGS: dict = {
+    'index': {
+        'number_of_shards': 1,
+        'number_of_replicas': 0,
+    },
+}
+"""Default index settings for testing."""
+
+# pylint: disable=C0115,C0116,R0913
+
+logger = logging.getLogger(__name__)
 
 
 def get_kind(scenario) -> str:
