@@ -54,6 +54,6 @@ class ComponentMgr(EntityMgr):
                 )
             self.appender(self.name)
         logger.info(
-            'Successfully created all component templates: %s',
-            prettystr(self.entity_list),
+            f'Successfully created all component templates: '
+            f'{prettystr(self.entity_list)}'
         )

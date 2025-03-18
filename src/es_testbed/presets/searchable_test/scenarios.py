@@ -32,6 +32,7 @@ class Scenarios:
 
     def __init__(self):
         """Initialize the scenarios for this preset"""
+        _ = 'init'  # Add to avoid empty function body
 
     # #####################
     # ### Hot Scenarios ###
@@ -106,27 +107,12 @@ class Scenarios:
             {
                 'options': {
                     'count': 10,
-                    'start_at': 0,
+                    'start_at': i * 10,
                     'match': True,
                 },
-                'target_tier': 'frozen',
-            },
-            {
-                'options': {
-                    'count': 10,
-                    'start_at': 10,
-                    'match': True,
-                },
-                'target_tier': 'frozen',
-            },
-            {
-                'options': {
-                    'count': 10,
-                    'start_at': 20,
-                    'match': True,
-                },
-                'target_tier': 'hot',
-            },
+                'target_tier': 'frozen' if i < 2 else 'hot',
+            }
+            for i in range(3)
         ]
 
     def define_ilm(
@@ -153,7 +139,7 @@ class Scenarios:
             'index_buildlist': self.build_list(),
             'ilm': {'enabled': False, 'phases': ['hot', 'delete']},
         }
-        for idx in range(0, len(retval['index_buildlist'])):
+        for idx in range(len(retval['index_buildlist'])):
             # By default, make everything have the phase as the target_tier
             retval['index_buildlist'][idx]['target_tier'] = phase
         if subtype != 'basic':

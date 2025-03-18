@@ -53,7 +53,7 @@ class IlmMgr(EntityMgr):
                 )
             # This goes first because the length of entity_list determines the suffix
             self.appender(self.name)
-            logger.info('Successfully created ILM policy: %s', self.last)
+            logger.info(f'Successfully created ILM policy: {self.last}')
             logger.debug(self.client.ilm.get_lifecycle(name=self.last))
         else:
             self.appender(None)  # This covers self.plan.ilm_policies[-1]

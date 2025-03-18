@@ -1,13 +1,32 @@
 """es-testbed Exceptions"""
 
+from typing import Any, Tuple
+
 
 class TestbedException(Exception):  # parent exception
     """
     Base class for all exceptions raised by the tool which are not Elasticsearch
     or es_client exceptions.
+
+    For the 'errors' attribute, errors are ordered from
+    most recently raised (index=0) to least recently raised (index=N)
     """
 
     __test__ = False
+
+    def __init__(self, message: Any, errors: Tuple[Exception, ...] = ()):
+        super().__init__(message)
+        self.message = message
+        self.errors = tuple(errors)
+
+    def __repr__(self) -> str:
+        parts = [repr(self.message)]
+        if self.errors:
+            parts.append(f"errors={self.errors!r}")
+        return f'{self.__class__.__name__}({", ".join(parts)})'
+
+    def __str__(self) -> str:
+        return str(self.message)
 
 
 class MissingArgument(TestbedException):

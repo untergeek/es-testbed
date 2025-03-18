@@ -53,4 +53,4 @@ class TemplateMgr(EntityMgr):
                 f'Unable to verify creation of index template {self.name}'
             )
         self.appender(self.name)
-        logger.info('Successfully created index template: %s', self.last)
+        logger.info(f'Successfully created index template: {self.last}')

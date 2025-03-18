@@ -39,12 +39,12 @@ NAMEMAPPER: t.Dict[str, str] = {
     'snapshot': 'snp',
 }
 
-PAUSE_DEFAULT: str = '0.25'
+PAUSE_DEFAULT: str = '1.0'
 PAUSE_ENVVAR: str = 'ES_TESTBED_PAUSE'
 
 PLURALMAP: t.Dict[str, str] = {
-    'ilm': 'ILM Policie',
-    'index': 'indice',
+    'ilm': 'ILM Policies',
+    'index': 'indices',
 }
 
 TESTPLAN: dict = {
@@ -61,6 +61,7 @@ TESTPLAN: dict = {
     },
     'entities': [],
 }
+"""Default values for the TestPlan settings"""
 
 TIER: dict = {
     'hot': {'pref': 'data_hot,data_content'},
@@ -123,7 +124,7 @@ def ilmdelete() -> IlmPhase:
     return {'min_age': '5d', 'actions': {'delete': {}}}
 
 
-def ilm_phase(value):
+def ilm_phase(value: str) -> IlmPhase:
     """Return the default phase step based on 'value'"""
     phase_map = {
         'hot': ilmhot(),
@@ -135,6 +136,6 @@ def ilm_phase(value):
     return {value: phase_map[value]}
 
 
-def ilm_force_merge(max_num_segments=1):
+def ilm_force_merge(max_num_segments: int = 1) -> t.Dict[str, t.Dict[str, int]]:
     """Return an ILM policy force merge action block using max_num_segments"""
     return {'forcemerge': {'max_num_segments': max_num_segments}}

@@ -47,7 +47,7 @@ class DataStreamMgr(IndexMgr):
         try:
             create_data_stream(self.client, value)
         except Exception as err:
-            logger.critical('Error creating data_stream: %s', err)
+            logger.critical(f'Error creating data_stream: {prettystr(err)}')
             raise err
         self.track_data_stream()
 
@@ -57,7 +57,7 @@ class DataStreamMgr(IndexMgr):
             self.index_trackers[idx].mount_ss(scheme)
         logger.info('Completed backing index promotion to searchable snapshots.')
         logger.info(
-            'data_stream backing indices: %s', prettystr(self.ds.backing_indices)
+            f'data_stream backing indices: {prettystr(self.ds.backing_indices)}'
         )
 
     def setup(self) -> None:
@@ -76,10 +76,9 @@ class DataStreamMgr(IndexMgr):
                 doc_generator=func,
                 options=scheme['options'],
             )
-        logger.debug('Created data_stream: %s', self.ds.name)
+        logger.debug(f'Created data_stream: {self.ds.name}')
         logger.debug(
-            'Created data_stream backing indices: %s',
-            prettystr(self.ds.backing_indices),
+            f'Created data_stream backing indices: {prettystr(self.ds.backing_indices)}'
         )
         for index in self.ds.backing_indices:
             self.track_index(index)
@@ -90,13 +89,13 @@ class DataStreamMgr(IndexMgr):
 
     def track_data_stream(self) -> None:
         """Add a DataStream entity and append it to entity_list"""
-        logger.debug('Tracking data_stream: %s', self.name)
+        logger.debug(f'Tracking data_stream: {self.name}')
         self.ds = DataStream(client=self.client, name=self.name)
         self.appender(self.name)
 
     def track_index(self, name: str) -> None:
         """Add an Index entity and append it to index_trackers"""
-        logger.debug('Tracking index: "%s"', name)
+        logger.debug(f'Tracking index: "{name}"')
         entity = Index(
             client=self.client,
             name=name,
