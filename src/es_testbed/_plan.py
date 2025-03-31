@@ -3,6 +3,7 @@
 import typing as t
 import logging
 from dotmap import DotMap
+import tiered_debug as debug
 from es_testbed.defaults import TESTPLAN
 from es_testbed.helpers.utils import build_ilm_policy, prettystr, randomstr
 
@@ -96,15 +97,17 @@ class PlanBuilder:
         Raises:
             ValueError: Must provide a settings dictionary
         """
+        debug.lv2('Initializing PlanBuilder object...')
         if settings is None:
             raise ValueError('Must provide a settings dictionary')
         self.settings = settings
-        logger.debug(f'SETTINGS: {settings}')
+        debug.lv5(f'SETTINGS: {settings}')
         self._plan = DotMap(TESTPLAN)
-        logger.debug(f'INITIAL PLAN: {prettystr(self._plan)}')
+        debug.lv5(f'INITIAL PLAN: {prettystr(self._plan)}')
         self._plan.cleanup = 'UNSET'  # Future use?
         if autobuild:
             self.setup()
+        debug.lv3('PlanBuilder object initialized')
 
     @property
     def plan(self) -> DotMap:
@@ -112,6 +115,7 @@ class PlanBuilder:
         return self._plan
 
     def _create_lists(self) -> None:
+        debug.lv2('Starting method...')
         names = [
             'indices',
             'data_stream',
@@ -122,26 +126,33 @@ class PlanBuilder:
         ]
         for name in names:
             self._plan[name] = []
+        debug.lv3('Exiting method')
 
     def setup(self) -> None:
         """Do initial setup of the Plan DotMap"""
+        debug.lv2('Starting method...')
         self._plan.uniq = randomstr(length=8, lowercase=True)
         self._create_lists()
         self.update(self.settings)  # Override with settings.
         self.update_rollover_alias()
-        logger.debug('Rollover alias updated')
+        debug.lv3('Rollover alias updated')
         self.update_ilm()
-        logger.debug(f'FINAL PLAN: {prettystr(self._plan.toDict())}')
+        debug.lv5(f'FINAL PLAN: {prettystr(self._plan.toDict())}')
+        debug.lv3('Exiting method')
 
     def update(self, settings: t.Dict) -> None:
         """Update the Plan DotMap"""
+        debug.lv2('Starting method...')
         self._plan.update(DotMap(settings))
+        debug.lv5(f'Updated plan: {prettystr(self._plan.toDict())}')
+        debug.lv3('Exiting method')
 
     def update_ilm(self) -> None:
         """Update the ILM portion of the Plan DotMap"""
+        debug.lv2('Starting method...')
         setdefault = False
         if 'ilm' not in self._plan:
-            logger.debug('key "ilm" is not in plan')
+            debug.lv3('key "ilm" is not in plan')
             setdefault = True
         if isinstance(self._plan.ilm, dict):
             _ = DotMap(self._plan.ilm)
@@ -149,7 +160,7 @@ class PlanBuilder:
         if isinstance(self._plan.ilm, DotMap):
             if 'enabled' not in self._plan.ilm:
                 # Override with defaults
-                logger.debug(
+                debug.lv3(
                     'plan.ilm does not have key "enabled". Overriding with defaults'
                 )
                 setdefault = True
@@ -158,10 +169,10 @@ class PlanBuilder:
                 logger.warning(
                     '"plan.ilm: True" is incorrect. Use plan.ilm.enabled: True'
                 )
-            logger.debug('plan.ilm is boolean. Overriding with defaults')
+            debug.lv3('plan.ilm is boolean. Overriding with defaults')
             setdefault = True
         if setdefault:
-            logger.debug('Setting defaults for ILM')
+            debug.lv3('Setting defaults for ILM')
             self._plan.ilm = DotMap(TESTPLAN['ilm'])
         if self._plan.ilm.enabled:
             ilm = self._plan.ilm
@@ -172,8 +183,8 @@ class PlanBuilder:
                 if 'searchable' in entity and entity['searchable'] is not None:
                     if not entity['searchable'] in ilm.phases:
                         ilm.phases.append(entity['searchable'])
-            logger.debug(f'ILM = {ilm}')
-            logger.debug(f'self._plan.ilm = {self._plan.ilm}')
+            debug.lv5(f'ILM = {ilm}')
+            debug.lv5(f'self._plan.ilm = {self._plan.ilm}')
             kwargs = {
                 'phases': ilm.phases,
                 'forcemerge': ilm.forcemerge,
@@ -181,12 +192,16 @@ class PlanBuilder:
                 'readonly': ilm.readonly,
                 'repository': self._plan.repository,
             }
-            logger.debug(f'KWARGS = {kwargs}')
+            debug.lv5(f'KWARGS = {kwargs}')
             self._plan.ilm.policy = build_ilm_policy(**kwargs)
+            debug.lv3('Exiting method')
 
     def update_rollover_alias(self) -> None:
         """Update the Rollover Alias value"""
+        debug.lv2('Starting method...')
         if self._plan.rollover_alias:
             self._plan.rollover_alias = f'{self._plan.prefix}-idx-{self._plan.uniq}'
         else:
             self._plan.rollover_alias = None
+        debug.lv5(f'Updated rollover_alias = {self._plan.rollover_alias}')
+        debug.lv3('Exiting method')

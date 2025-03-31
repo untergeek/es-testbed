@@ -1,6 +1,8 @@
 """Pytest configuration for unit tests."""
 
+# pylint: disable=redefined-outer-name,C0116,W0212
 import typing as t
+import logging
 from unittest.mock import MagicMock, Mock, patch
 import datetime
 import pytest
@@ -20,8 +22,7 @@ from es_testbed.helpers.utils import build_ilm_phase
 from es_testbed.ilm import IlmTracker
 from . import forcemerge, searchable, ALIAS, INDEX1, INDICES, REPO, TIERS, TREPO
 
-
-# pylint: disable=redefined-outer-name,C0116,W0212
+logger = logging.getLogger(__name__)
 
 FMAP: t.Dict[str, t.Dict] = {
     'hot': ilmhot(),
@@ -174,6 +175,16 @@ def settings():
 @pytest.fixture
 def tier(request) -> str:
     return request.param
+
+
+@pytest.fixture
+def tiered_debug(request) -> int:
+    """Fixture to set the tiered debug level for tests"""
+    retval = int(request.param)
+    logger.debug(f'Tiered debug level set to {retval}')
+    if not 1 <= retval <= 5:
+        retval = 1
+    return retval
 
 
 # Fixture to create a basic IlmTracker instance with mocked dependencies
