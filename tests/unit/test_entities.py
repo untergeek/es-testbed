@@ -72,6 +72,7 @@ def paramlist(test_map: dict) -> t.Sequence[pytest.param]:
 @pytest.mark.parametrize(ALIAS_FIXT, paramlist(ALIAS_PARAMS), indirect=True)
 def test_verify_method(alias, alias_cls, expected, idx_list, retval, caplog):
     """Test Alias.verify method."""
+    alias_cls.set_debug_tier(5)
     with patch(
         'es_testbed.entities.alias.resolver',
         return_value={'aliases': [retval]},
@@ -81,6 +82,7 @@ def test_verify_method(alias, alias_cls, expected, idx_list, retval, caplog):
         if result:
             assert 'Confirm list index position [0] match of alias' in caplog.text
             assert f'Confirm match of indices backed by alias {alias}' in caplog.text
+    alias_cls.set_debug_tier(1)
 
 
 # --- Index Tests ---
@@ -88,6 +90,7 @@ def test_verify_method(alias, alias_cls, expected, idx_list, retval, caplog):
 
 @pytest.mark.parametrize(INDEX_FIXT, paramlist(INDEX_PARAMS), indirect=True)
 def test_get_target(index_cls, phase, phases, expected, logmsg, caplog):
+    index_cls.set_debug_tier(3)
     index_cls.ilm_tracker.policy_phases = phases
     index_cls.ilm_tracker.explain.phase = phase
     index_cls.ilm_tracker.pname.side_effect = lambda x: {
@@ -100,6 +103,7 @@ def test_get_target(index_cls, phase, phases, expected, logmsg, caplog):
     assert target == expected
     if logmsg:
         assert logmsg in caplog.text
+    index_cls.set_debug_tier(1)
 
 
 def test_phase_tuple(index_cls):
@@ -114,6 +118,7 @@ def test_phase_tuple(index_cls):
 
 
 def test_add_snap_step(index_cls, caplog):
+    index_cls.set_debug_tier(5)
     index_cls.snapmgr = MagicMock()
     snap = 'snapshot1'
     with patch('es_testbed.entities.index.snapshot_name', return_value=snap):
@@ -121,6 +126,7 @@ def test_add_snap_step(index_cls, caplog):
         assert 'Getting snapshot name for tracking...' in caplog.text
         assert f'Snapshot {snap} backs {INDEX1}' in caplog.text
         index_cls.snapmgr.add_existing.assert_called_once_with(snap)
+    index_cls.set_debug_tier(1)
 
 
 def test_ilm_step(index_cls, caplog):
@@ -132,14 +138,16 @@ def test_ilm_step(index_cls, caplog):
     index_cls.client.ilm.explain_lifecycle.return_value = {
         "indices": {INDEX1: {'phase': phase, 'action': action, 'step': name}}
     }
+    index_cls.set_debug_tier(5)
     with patch('es_testbed.entities.index.IlmStep') as mock_ilm_step:
         mock_ilm_step_instance = mock_ilm_step.return_value
         index_cls._ilm_step()
-        assert f'{INDEX1}: Current Step:' in caplog.text
+        assert f'DEBUG5 {INDEX1}: Current Step:' in caplog.text
         assert f"'phase': '{phase}'" in caplog.text
         assert f"'action': '{action}'" in caplog.text
         assert f"'name': '{name}'" in caplog.text
         mock_ilm_step_instance.wait.assert_called_once()
+    index_cls.set_debug_tier(1)
 
 
 def test_ilm_step_failure(index_cls):
@@ -192,6 +200,7 @@ def test_wait_try_general_exception(index_cls):
 
 def test_mounted_step(index_cls, caplog):
     caplog.set_level(10)
+    index_cls.set_debug_tier(3)
     index_cls.ilm_tracker.advance = MagicMock()
     new = 'new-index'
     target = 'cold'
@@ -211,6 +220,7 @@ def test_mounted_step(index_cls, caplog):
             assert f'Updating self.name from "{INDEX1}" to "{new}"...' in caplog.text
             assert 'Waiting for the ILM steps to complete...' in caplog.text
             assert f'Switching to track "{new}" as self.name...' in caplog.text
+    index_cls.set_debug_tier(1)
 
 
 def test_mounted_step_bad_request_error(index_cls):
@@ -255,16 +265,19 @@ def test_manual_ss(index_cls):
 
 def test_mount_ss_no_policy(index_cls, caplog):
     caplog.set_level(10)
+    index_cls.set_debug_tier(3)
     index_cls.snapmgr = MagicMock()
     scheme = {'target_tier': 'cold'}
     with patch.object(index_cls, 'manual_ss') as mock_manual_ss:
         index_cls.mount_ss(scheme)
         assert f'No ILM policy for "{INDEX1}". Trying manual...' in caplog.text
         mock_manual_ss.assert_called_once_with(scheme)
+    index_cls.set_debug_tier(1)
 
 
 def test_mount_ss_write_index(index_cls, caplog):
     caplog.set_level(10)
+    index_cls.set_debug_tier(5)
     with patch('es_testbed.entities.Index.am_i_write_idx', return_value=True):
         scheme = {'target_tier': 'cold'}
         index_cls.mount_ss(scheme)
@@ -272,10 +285,12 @@ def test_mount_ss_write_index(index_cls, caplog):
             f'"{INDEX1}" is the write_index. Cannot mount as searchable snapshot'
             in caplog.text
         )
+    index_cls.set_debug_tier(1)
 
 
 def test_mount_ss_phase_new(index_cls, caplog):
     caplog.set_level(10)
+    index_cls.set_debug_tier(3)
     curr, target = ('new', 'cold')
     index_cls.policy_name = 'test-policy'
     index_cls.ilm_tracker = MagicMock()
@@ -291,6 +306,7 @@ def test_mount_ss_phase_new(index_cls, caplog):
                 in caplog.text
             )
             mock_wait_try.assert_any_call(mock_ilm_phase_instance.wait)
+    index_cls.set_debug_tier(1)
 
 
 def test_mount_ss_phase_new_raises(index_cls, caplog):

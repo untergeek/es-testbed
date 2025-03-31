@@ -33,8 +33,9 @@ keywords = [
 dependencies = [
     'gitpython==3.1.43',
     'dotmap==1.3.30',
-    'es_client>=8.17.4',
-    'es-wait>=0.11.0',
+    'es_client>=8.17.5',
+    'es-wait>=0.12.0',
+    'tiered_debug==1.0.0',
 ]
 
 [project.optional-dependencies]

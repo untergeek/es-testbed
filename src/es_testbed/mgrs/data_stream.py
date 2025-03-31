@@ -3,6 +3,7 @@
 import typing as t
 import logging
 from importlib import import_module
+import tiered_debug as debug
 from es_testbed.entities import DataStream, Index
 from es_testbed.helpers.es_api import create_data_stream, fill_index
 from es_testbed.helpers.utils import prettystr
@@ -30,7 +31,9 @@ class DataStreamMgr(IndexMgr):
     ):
         self.ds = None
         self.index_trackers = []
+        debug.lv3('Initializing DataStreamMgr object...')
         super().__init__(client=client, plan=plan, snapmgr=snapmgr)
+        debug.lv3('DataStreamMgr object initialized')
 
     @property
     def suffix(self):
@@ -44,24 +47,28 @@ class DataStreamMgr(IndexMgr):
 
     def add(self, value):
         """Create a data stream and track it"""
+        debug.lv2('Starting method...')
         try:
+            debug.lv4(f'TRY: Creating data_stream {value}')
             create_data_stream(self.client, value)
         except Exception as err:
             logger.critical(f'Error creating data_stream: {prettystr(err)}')
             raise err
         self.track_data_stream()
+        debug.lv3('Exiting method')
 
     def searchable(self):
         """If the indices were marked as searchable snapshots, we do that now"""
+        debug.lv2('Starting method...')
         for idx, scheme in enumerate(self.plan.index_buildlist):
             self.index_trackers[idx].mount_ss(scheme)
         logger.info('Completed backing index promotion to searchable snapshots.')
-        logger.info(
-            f'data_stream backing indices: {prettystr(self.ds.backing_indices)}'
-        )
+        debug.lv5(f'data_stream backing indices: {prettystr(self.ds.backing_indices)}')
+        debug.lv3('Exiting method')
 
     def setup(self) -> None:
         """Setup the entity manager"""
+        debug.lv2('Starting method...')
         self.index_trackers = []  # Inheritance oddity requires redeclaration here
         mod = import_module(f'{self.plan.modpath}.functions')
         func = getattr(mod, 'doc_generator')
@@ -76,8 +83,8 @@ class DataStreamMgr(IndexMgr):
                 doc_generator=func,
                 options=scheme['options'],
             )
-        logger.debug(f'Created data_stream: {self.ds.name}')
-        logger.debug(
+        debug.lv2(f'Created data_stream: {self.ds.name}')
+        debug.lv3(
             f'Created data_stream backing indices: {prettystr(self.ds.backing_indices)}'
         )
         for index in self.ds.backing_indices:
@@ -86,16 +93,20 @@ class DataStreamMgr(IndexMgr):
         self.searchable()
         self.ds.verify(self.indexlist)
         logger.info('Successfully completed data_stream buildout.')
+        debug.lv3('Exiting method')
 
     def track_data_stream(self) -> None:
         """Add a DataStream entity and append it to entity_list"""
-        logger.debug(f'Tracking data_stream: {self.name}')
+        debug.lv2('Starting method...')
+        debug.lv3(f'Tracking data_stream: {self.name}')
         self.ds = DataStream(client=self.client, name=self.name)
         self.appender(self.name)
+        debug.lv3('Exiting method')
 
     def track_index(self, name: str) -> None:
         """Add an Index entity and append it to index_trackers"""
-        logger.debug(f'Tracking index: "{name}"')
+        debug.lv2('Starting method...')
+        debug.lv3(f'Tracking index: "{name}"')
         entity = Index(
             client=self.client,
             name=name,
@@ -104,3 +115,4 @@ class DataStreamMgr(IndexMgr):
         )
         entity.track_ilm(name)
         self.index_trackers.append(entity)
+        debug.lv3('Exiting method')

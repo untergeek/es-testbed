@@ -1,6 +1,6 @@
 """Tests for the es_testbed.helpers.es_api module"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 import re
 import pytest
 from elasticsearch8.exceptions import TransportError
@@ -384,9 +384,14 @@ class TestDelete:
             )
 
     def test_delete_none_name(self, client):
-        with patch('es_testbed.helpers.es_api.logger.debug') as mock_debug:
+        with patch('es_testbed.helpers.es_api.debug.lv3') as mock_debug:
             assert not delete(client, 'index', None)
-            mock_debug.assert_called_once_with('"index" has a None value for name')
+            mock_debug.assert_has_calls(
+                [
+                    call('"index" has a None value for name'),
+                    call('Exiting function, returning value'),
+                ]
+            )
 
 
 class TestGet:

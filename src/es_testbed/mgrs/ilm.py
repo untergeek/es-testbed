@@ -2,6 +2,7 @@
 
 import typing as t
 import logging
+import tiered_debug as debug
 from es_testbed.exceptions import ResultNotExpected
 from es_testbed.helpers.es_api import exists, put_ilm
 from es_testbed.helpers.utils import build_ilm_policy
@@ -25,10 +26,14 @@ class IlmMgr(EntityMgr):
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
     ):
+        """Initialize the ILM policy manager"""
+        debug.lv2('Initializing IlmMgr object...')
         super().__init__(client=client, plan=plan)
+        debug.lv3('IlmMgr object initialized')
 
     def get_policy(self) -> t.Dict:
         """Return the configured ILM policy"""
+        debug.lv2('Starting method...')
         d = self.plan.ilm
         kwargs = {
             'phases': d.phases,
@@ -37,11 +42,14 @@ class IlmMgr(EntityMgr):
             'readonly': d.readonly,
             'repository': self.plan.repository,
         }
-        return build_ilm_policy(**kwargs)
+        retval = build_ilm_policy(**kwargs)
+        debug.lv3('Exiting method, returning value')
+        debug.lv5(f'Value = {retval}')
+        return retval
 
     def setup(self) -> None:
         """Setup the entity manager"""
-        logger.debug('Starting IlmMgr setup...')
+        debug.lv2('Starting method...')
         if self.plan.ilm.enabled:
             if not self.plan.ilm.policy:  # If you've put a full policy there...
                 self.plan.ilm.policy = self.get_policy()
@@ -54,7 +62,8 @@ class IlmMgr(EntityMgr):
             # This goes first because the length of entity_list determines the suffix
             self.appender(self.name)
             logger.info(f'Successfully created ILM policy: {self.last}')
-            logger.debug(self.client.ilm.get_lifecycle(name=self.last))
+            debug.lv5(self.client.ilm.get_lifecycle(name=self.last))
         else:
             self.appender(None)  # This covers self.plan.ilm_policies[-1]
             logger.info('No ILM policy created.')
+        debug.lv3('Exiting method')

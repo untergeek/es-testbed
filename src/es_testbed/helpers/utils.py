@@ -11,6 +11,7 @@ from pprint import pformat
 from shutil import rmtree
 from tempfile import mkdtemp
 from git import Repo
+import tiered_debug as debug
 from ..defaults import ilm_force_merge, ilm_phase, TIER
 from ..exceptions import TestbedMisconfig
 
@@ -24,6 +25,7 @@ def build_ilm_phase(
     fm: bool = False,
 ) -> t.Dict:
     """Build a single ILM policy step based on phase"""
+    debug.lv2('Starting function...')
     retval = ilm_phase(phase)
     if phase in ['cold', 'frozen']:
         if repo:
@@ -39,6 +41,8 @@ def build_ilm_phase(
             raise TestbedMisconfig(msg)
     if actions:
         retval[phase]['actions'].update(actions)
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = {retval}')
     return retval
 
 
@@ -53,6 +57,7 @@ def build_ilm_policy(
     Build a full ILM policy based on the provided phases.
     Put forcemerge in the last phase before cold or frozen (whichever comes first)
     """
+    debug.lv2('Starting function...')
     if not phases:
         phases = ['hot', 'delete']
     retval = {}
@@ -68,17 +73,24 @@ def build_ilm_policy(
         retval['hot']['actions'].update(
             ilm_force_merge(max_num_segments=max_num_segments)
         )
+    debug.lv3('Exiting function, returing value')
+    debug.lv5("Value = {'phases': " + f'{retval}' + "}")
     return {'phases': retval}
 
 
 def get_routing(tier='hot') -> t.Dict:
     """Return the routing allocation tier preference"""
+    debug.lv2('Starting function...')
     try:
+        debug.lv4(f'Checking for tier: {tier}')
         pref = TIER[tier]['pref']
     except KeyError:
         # Fallback value
         pref = 'data_content'
-    return {'index.routing.allocation.include._tier_preference': pref}
+    retval = {'index.routing.allocation.include._tier_preference': pref}
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = {retval}')
+    return retval
 
 
 def iso8601_now() -> str:
@@ -115,7 +127,11 @@ def iso8601_now() -> str:
 
 def mounted_name(index: str, tier: str):
     """Return a value for renamed_index for mounting a searchable snapshot index"""
-    return f'{TIER[tier]["prefix"]}-{index}'
+    debug.lv2('Starting function...')
+    retval = f'{TIER[tier]["prefix"]}-{index}'
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = {retval}')
+    return retval
 
 
 def prettystr(*args, **kwargs) -> str:
@@ -163,6 +179,7 @@ def process_preset(
     :param ref: A Git ref (e.g. 'main'). Only used by preset `git`
     :param url: A Git repository URL. Only used by preset `git`
     """
+    debug.lv2('Starting function...')
     modpath = None
     tmpdir = None
     if builtin:  # Overrides any other options
@@ -170,14 +187,16 @@ def process_preset(
     else:
         trygit = False
         try:
+            debug.lv4('TRY: Checking for git preset')
             kw = {'path': path, 'ref': ref, 'url': url}
             raise_on_none(**kw)
             trygit = True  # We have all 3 kwargs necessary for git
         except ValueError as resp:  # Not able to do a git preset
-            logger.debug(f'Unable to import a git-based preset: {resp}')
+            debug.lv1(f'Unable to import a git-based preset: {resp}')
         if trygit:  # Trying a git import
             tmpdir = mkdtemp()
             try:
+                debug.lv4('TRY: Attempting to clone git repository')
                 _ = Repo.clone_from(url, tmpdir, branch=ref, depth=1)
                 filepath = Path(tmpdir) / path
             except Exception as err:
@@ -191,6 +210,8 @@ def process_preset(
         parent = filepath.parent.resolve()  # Up one level
         # We now make the parent path part of the sys.path.
         sys.path.insert(0, parent)  # This should persist beyond this module
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = ({modpath}, {tmpdir})')
     return modpath, tmpdir
 
 
@@ -198,25 +219,40 @@ def python_version() -> t.Tuple:
     """
     Return running Python version tuple, e.g. 3.12.2 would be (3, 12, 2)
     """
+    debug.lv2('Starting function...')
     _ = sys.version_info
-    return (_[0], _[1], _[2])
+    retval = (_[0], _[1], _[2])
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = {retval}')
+    return retval
 
 
 def raise_on_none(**kwargs):
     """Raise if any kwargs have a None value"""
+    debug.lv2('Starting function...')
     for key, value in kwargs.items():
         if value is None:
+            debug.lv3('Exiting function, raising ValueError')
             raise ValueError(f'kwarg "{key}" cannot have a None value')
+    debug.lv3('Exiting function')
 
 
 def randomstr(length: int = 16, lowercase: bool = False) -> str:
     """Generate a random string"""
+    debug.lv2('Starting function...')
     letters = string.ascii_uppercase
     if lowercase:
         letters = string.ascii_lowercase
-    return str(''.join(random.choices(letters + string.digits, k=length)))
+    retval = str(''.join(random.choices(letters + string.digits, k=length)))
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = {retval}')
+    return retval
 
 
 def storage_type(tier: str) -> t.Dict:
     """Return the storage type of a searchable snapshot by tier"""
-    return TIER[tier]["storage"]
+    debug.lv2('Starting function...')
+    retval = TIER[tier]["storage"]
+    debug.lv3('Exiting function, returing value')
+    debug.lv5(f'Value = {retval}')
+    return retval

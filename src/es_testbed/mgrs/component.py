@@ -3,6 +3,7 @@
 import typing as t
 import logging
 from importlib import import_module
+import tiered_debug as debug
 from es_testbed.exceptions import ResultNotExpected
 from es_testbed.helpers.es_api import exists, put_comp_tmpl
 from es_testbed.helpers.utils import prettystr
@@ -26,7 +27,9 @@ class ComponentMgr(EntityMgr):
         client: t.Union['Elasticsearch', None] = None,
         plan: t.Union['DotMap', None] = None,
     ):
+        debug.lv2('Initializing ComponentMgr object...')
         super().__init__(client=client, plan=plan)
+        debug.lv3('ComponentMgr object initialized')
 
     @property
     def components(self) -> t.Sequence[t.Dict]:
@@ -46,6 +49,7 @@ class ComponentMgr(EntityMgr):
 
     def setup(self) -> None:
         """Setup the entity manager"""
+        debug.lv2('Starting method...')
         for component in self.components:
             put_comp_tmpl(self.client, self.name, component)
             if not exists(self.client, self.kind, self.name):
@@ -57,3 +61,4 @@ class ComponentMgr(EntityMgr):
             f'Successfully created all component templates: '
             f'{prettystr(self.entity_list)}'
         )
+        debug.lv3('Exiting method')

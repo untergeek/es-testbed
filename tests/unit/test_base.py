@@ -123,7 +123,7 @@ def test_fodder_generator_no_repository(testbed_fodder):
     """
     testbed_fodder.plan.repository = None
     with patch('es_testbed._base.get', return_value=['entity1', 'entity2']) as mock_get:
-        with patch('es_testbed._base.logger.debug') as mock_debug:
+        with patch('es_testbed._base.debug.lv4') as mock_debug:
             generator = testbed_fodder._fodder_generator()
             items = list(generator)
             assert len(items) == 5  # 'snapshot' should be skipped
@@ -140,7 +140,8 @@ def test_fodder_generator_no_repository(testbed_fodder):
                     pattern,
                     repository=testbed_fodder.plan.repository,
                 )
-            mock_debug.assert_called_once_with('No repository, no snapshots.')
+            # assert 'No repository, no snapshots.' in caplog.text
+            mock_debug.assert_called_with('No repository, no snapshots.')
 
 
 def test_while(testbed):
@@ -157,8 +158,10 @@ def test_while_failure(testbed):
 
 def test_get_ilm_polling_produces_debug_log(testbed, caplog):
     """Test get_ilm_polling produces debug log"""
+    testbed.set_debug_tier(5)
     testbed.get_ilm_polling()
     assert 'Cluster settings' in caplog.text
+    testbed.set_debug_tier(1)
 
 
 def test_get_ilm_polling_exception(testbed, caplog):
