@@ -9,7 +9,7 @@ from es_wait import Exists, Snapshot
 from es_wait import debug as es_wait_debug
 from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
 from .debug import debug, begin_end
-from .defaults import MAPPING, PAUSE_DEFAULT, PAUSE_ENVVAR
+from .defaults import PAUSE_DEFAULT, PAUSE_ENVVAR  # MAPPING
 from .exceptions import (
     NameChanged,
     ResultNotExpected,
@@ -167,9 +167,10 @@ def create_data_stream(client: 'Elasticsearch', name: str) -> None:
 def create_index(
     client: 'Elasticsearch',
     name: str,
-    aliases: t.Union[t.Dict, None] = None,
-    settings: t.Union[t.Dict, None] = None,
     tier: str = 'hot',
+    aliases: t.Optional[t.Dict] = None,
+    mappings: t.Optional[t.Dict] = None,
+    settings: t.Optional[t.Dict] = None,
 ) -> None:
     """Create named index"""
     if not settings:
@@ -182,7 +183,7 @@ def create_index(
     f_kwargs = {
         'index': name,
         'aliases': aliases,
-        'mappings': MAPPING,
+        'mappings': mappings,
         'settings': settings,
     }
     debug.lv5(f'f_kwargs: {f_kwargs}')
