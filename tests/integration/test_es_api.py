@@ -1,10 +1,9 @@
-"""Integration tests for es_testbed.helpers.es_utils"""
-
-import pytest
-from es_testbed.helpers.es_api import create_index, delete, verify
-from . import INDEX1, SETTINGS
+"""Integration tests for es_testbed.es_utils"""
 
 # pylint: disable=C0115,C0116,R0903,R0913,R0917,W0212
+import pytest
+from es_testbed.es_api import create_index, delete, verify
+from . import INDEX1, SETTINGS
 
 
 def test_delete(client):

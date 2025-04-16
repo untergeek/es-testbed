@@ -3,21 +3,16 @@
 import typing as t
 import logging
 from os import getenv
-import tiered_debug as debug
 from elasticsearch8.exceptions import BadRequestError
 from es_wait import Exists, IlmPhase, IlmStep
 from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
-from es_testbed.defaults import (
-    PAUSE_DEFAULT,
-    PAUSE_ENVVAR,
-    TIMEOUT_DEFAULT,
-    TIMEOUT_ENVVAR,
-)
-from es_testbed.exceptions import TestbedFailure
-from es_testbed.entities.entity import Entity
-from es_testbed.helpers.es_api import snapshot_name
-from es_testbed.helpers.utils import mounted_name, prettystr
-from es_testbed.ilm import IlmTracker
+from ..debug import debug, begin_end
+from ..defaults import PAUSE_DEFAULT, PAUSE_ENVVAR, TIMEOUT_DEFAULT, TIMEOUT_ENVVAR
+from ..es_api import snapshot_name
+from ..exceptions import TestbedFailure
+from ..ilm import IlmTracker
+from ..utils import mounted_name, prettystr
+from .entity import Entity
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -46,6 +41,7 @@ class Index(Entity):
         debug.lv3('Index entity object initialized')
 
     @property
+    @begin_end()
     def _get_target(self) -> str:
         target = None
         phases = self.ilm_tracker.policy_phases
@@ -71,17 +67,16 @@ class Index(Entity):
         """Return the current phase and the target phase as a Tuple"""
         return self.ilm_tracker.explain.phase, self._get_target
 
+    @begin_end()
     def _add_snap_step(self) -> None:
-        debug.lv2('Starting method...')
         debug.lv4('Getting snapshot name for tracking...')
         snapname = snapshot_name(self.client, self.name)
         debug.lv5(f'Snapshot {snapname} backs {self.name}')
         self.snapmgr.add_existing(snapname)
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def _ilm_step(self) -> None:
         """Subroutine for waiting for an ILM step to complete"""
-        debug.lv2('Starting method...')
         step = {
             'phase': self.ilm_tracker.explain.phase,
             'action': self.ilm_tracker.explain.action,
@@ -99,11 +94,10 @@ class Index(Entity):
             debug.lv3('Exiting method, raising exception')
             debug.lv5(f'Exception: {prettystr(err)}')
             raise err
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def _wait_try(self, func: t.Callable) -> None:
         """Wait for an es-wait function to complete"""
-        debug.lv2('Starting method...')
         try:
             debug.lv4('TRY: To run func()...')
             func()
@@ -123,10 +117,9 @@ class Index(Entity):
             debug.lv3('Exiting method, raising exception')
             debug.lv5(f'Exception: {prettystr(err)}')
             raise TestbedFailure(f'General Exception caught: {prettystr(err)}') from err
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def _mounted_step(self, target: str) -> str:
-        debug.lv2('Starting method...')
         try:
             debug.lv4(f'TRY: Moving "{self.name}" to ILM phase "{target}"')
             self.ilm_tracker.advance(phase=target)
@@ -168,14 +161,13 @@ class Index(Entity):
         # Track the new index
         debug.lv3(f'Switching to track "{newidx}" as self.name...')
         self.track_ilm(newidx)
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def manual_ss(self, scheme: t.Dict[str, t.Any]) -> None:
         """
         If we are NOT using ILM but have specified searchable snapshots in the plan
         entities
         """
-        debug.lv2('Starting method...')
         if 'target_tier' in scheme and scheme['target_tier'] in ['cold', 'frozen']:
             debug.lv3('Manually mounting as searchable snapshot...')
             debug.lv5(
@@ -185,23 +177,22 @@ class Index(Entity):
             self.snapmgr.add(self.name, scheme['target_tier'])
             # Replace self.name with the renamed name
             self.name = mounted_name(self.name, scheme['target_tier'])
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def mount_ss(self, scheme: dict) -> None:
         """If the index is planned to become a searchable snapshot, we do that now"""
-        debug.lv2('Starting method...')
         debug.lv3(f'Checking if "{self.name}" should be a searchable snapshot')
         if self.am_i_write_idx:
             debug.lv5(
                 f'"{self.name}" is the write_index. Cannot mount as searchable '
                 f'snapshot'
             )
-            debug.lv3('Exiting method')
+
             return
         if not self.policy_name:  # If we have this, chances are we have a policy
             debug.lv3(f'No ILM policy for "{self.name}". Trying manual...')
             self.manual_ss(scheme)
-            debug.lv3('Exiting method')
+
             return
         phase = self.ilm_tracker.next_phase
         debug.lv5(f'Next phase for "{self.name}" = {phase}')
@@ -248,14 +239,13 @@ class Index(Entity):
             # Record the snapshot in our tracker
             debug.lv5('Adding snapshot step to snapmgr...')
             self._add_snap_step()
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def track_ilm(self, name: str) -> None:
         """
         Get ILM phase information and put it in self.ilm_tracker
         Name as an arg makes it configurable
         """
-        debug.lv2('Starting method...')
         if self.policy_name:
             debug.lv5(f'ILM policy name: {self.policy_name}')
             debug.lv5(f'Creating ILM tracker for "{name}"')
@@ -264,4 +254,3 @@ class Index(Entity):
             self.ilm_tracker.update()
         else:
             debug.lv5('No ILM policy name. Skipping ILM tracking')
-        debug.lv3('Exiting method')

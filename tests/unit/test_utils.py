@@ -1,4 +1,4 @@
-"""Test functions in es_testbed.helpers.utils"""
+"""Test functions in es_testbed.utils"""
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 from unittest.mock import patch
@@ -6,7 +6,7 @@ import datetime
 import pytest
 from es_testbed.defaults import TIER
 from es_testbed.exceptions import TestbedMisconfig
-from es_testbed.helpers.utils import (
+from es_testbed.utils import (
     build_ilm_phase,
     build_ilm_policy,
     get_routing,
@@ -108,7 +108,7 @@ def test_process_preset_builtin():
 
 
 def test_process_preset_path():
-    with patch('es_testbed.helpers.utils.Path') as mock_path:
+    with patch('es_testbed.utils.Path') as mock_path:
         mock_path.return_value.resolve.return_value.is_dir.return_value = True
         mock_path.return_value.resolve.return_value.name = 'path'
         modpath, tmpdir = process_preset(
@@ -119,9 +119,9 @@ def test_process_preset_path():
 
 
 def test_process_preset_git():
-    with patch('es_testbed.helpers.utils.Repo.clone_from') as mock_clone:
-        with patch('es_testbed.helpers.utils.mkdtemp', return_value='/tmp/dir'):
-            with patch('es_testbed.helpers.utils.Path') as mock_path:
+    with patch('es_testbed.utils.Repo.clone_from') as mock_clone:
+        with patch('es_testbed.utils.mkdtemp', return_value='/tmp/dir'):
+            with patch('es_testbed.utils.Path') as mock_path:
                 mock_path.return_value.resolve.return_value.is_dir.return_value = True
                 mock_path.return_value.resolve.return_value.name = 'dir'
                 modpath, tmpdir = process_preset(
@@ -138,7 +138,7 @@ def test_process_preset_git():
 
 
 def test_process_preset_invalid_path():
-    with patch('es_testbed.helpers.utils.Path') as mock_path:
+    with patch('es_testbed.utils.Path') as mock_path:
         mock_path.return_value.resolve.return_value.is_dir.return_value = False
         with pytest.raises(
             ValueError, match='The provided path "invalid/path" is not a directory'
@@ -269,7 +269,7 @@ def test_storage_type(phase):
     assert storage_type(phase) == TIER[phase]['storage']
 
 
-@patch('es_testbed.helpers.utils.TIER', {'hot': {'pref': 'data_hot'}})
+@patch('es_testbed.utils.TIER', {'hot': {'pref': 'data_hot'}})
 def test_get_routing_known_tier():
     """Test routing for a known tier."""
     result = get_routing('hot')
@@ -277,7 +277,7 @@ def test_get_routing_known_tier():
     assert result == expected, "Should return preference from TIER for known tier"
 
 
-@patch('es_testbed.helpers.utils.TIER', {})
+@patch('es_testbed.utils.TIER', {})
 def test_get_routing_unknown_tier():
     """Test routing for an unknown tier falls back to 'data_content'."""
     result = get_routing('unknown')
@@ -287,8 +287,8 @@ def test_get_routing_unknown_tier():
 
 # Can't get these to work right now
 #
-# @patch('es_testbed.helpers.utils.mkdtemp')
-# @patch('es_testbed.helpers.utils.Repo.clone_from')
+# @patch('es_testbed.utils.mkdtemp')
+# @patch('es_testbed.utils.Repo.clone_from')
 # def test_process_preset_git_success(mock_clone_from, mock_mkdtemp):
 #     """Test successful Git clone in process_preset."""
 #     mock_mkdtemp.return_value = '/tmp/testdir'
@@ -300,9 +300,9 @@ def test_get_routing_unknown_tier():
 #     assert modpath == 'path', "modpath should be the final directory name from path"
 #
 #
-# @patch('es_testbed.helpers.utils.mkdtemp')
-# @patch('es_testbed.helpers.utils.rmtree')
-# @patch('es_testbed.helpers.utils.logger')
+# @patch('es_testbed.utils.mkdtemp')
+# @patch('es_testbed.utils.rmtree')
+# @patch('es_testbed.utils.logger')
 # def test_process_preset_git_failure(mock_logger, mock_rmtree, mock_mkdtemp):
 #     """Test Git clone failure in process_preset."""
 #     mock_mkdtemp.return_value = '/tmp/testdir'

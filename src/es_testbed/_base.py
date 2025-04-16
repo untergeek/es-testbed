@@ -5,13 +5,13 @@ import logging
 from importlib import import_module
 from datetime import datetime, timezone
 from shutil import rmtree
-import tiered_debug as debug
-from es_testbed.exceptions import ResultNotExpected
-from es_testbed.defaults import NAMEMAPPER
-from es_testbed.helpers.es_api import delete, get
-from es_testbed.helpers.utils import prettystr, process_preset
-from es_testbed._plan import PlanBuilder
-from es_testbed.mgrs import (
+from .debug import debug, begin_end
+from .defaults import NAMEMAPPER
+from .es_api import delete, get
+from .exceptions import ResultNotExpected
+from .utils import prettystr, process_preset
+from ._plan import PlanBuilder
+from .mgrs import (
     ComponentMgr,
     DataStreamMgr,
     IlmMgr,
@@ -107,8 +107,8 @@ class TestBed:
         #: The data_stream entity manager
         self.data_streammgr = None
 
+    @begin_end()
     def _erase(self, kind: str, lst: t.Sequence[str]) -> None:
-        debug.lv2('Starting method...')
         overall_success = True
         if not lst:
             debug.lv3(f'{kind}: nothing to delete.')
@@ -118,15 +118,14 @@ class TestBed:
             overall_success = False not in ilm  # No False values == True
         else:
             overall_success = self._while(kind, ','.join(lst))
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {overall_success}')
+        debug.lv5(f'Return value = {overall_success}')
         return overall_success
 
-    def _fodder_generator(
+    @begin_end()
+    def _erase_all(
         self,
     ) -> t.Generator[str, t.Sequence[str], None]:
         """Method to delete everything matching our pattern(s)"""
-        debug.lv2('Starting method...')
         items = ['index', 'data_stream', 'snapshot', 'template', 'component', 'ilm']
         for i in items:
             if i == 'snapshot' and self.plan.repository is None:
@@ -135,10 +134,9 @@ class TestBed:
             pattern = f'*{self.plan.prefix}-{NAMEMAPPER[i]}-{self.plan.uniq}*'
             entities = get(self.client, i, pattern, repository=self.plan.repository)
             yield (i, entities)
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def _while(self, kind: str, item: str) -> bool:
-        debug.lv2('Starting method...')
         count = 1
         success = False
         exc = None
@@ -160,11 +158,11 @@ class TestBed:
             )
         return success
 
+    @begin_end()
     def get_ilm_polling(self) -> None:
         """
         Get current ILM polling settings and store them in self.plan.polling_interval
         """
-        debug.lv2('Starting method...')
         debug.lv3('Storing current ILM polling settings, if any...')
         try:
             debug.lv4('TRY: Getting cluster settings')
@@ -191,25 +189,17 @@ class TestBed:
             retval = None  # Must be an actual value to go into a DotMap
         self.plan.ilm_polling_interval = retval
         debug.lv3(f'Stored ILM Polling Interval: {retval}')
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def ilm_polling(self, interval: t.Union[str, None] = None) -> t.Dict:
         """Return persistent cluster settings to speed up ILM polling during testing"""
-        debug.lv2('Starting method...')
         retval = {'indices.lifecycle.poll_interval': interval}
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval
 
-    def set_debug_tier(self, tier: int) -> None:
-        """
-        Set the debug tier globally for this module
-        """
-        debug.set_level(tier)
-
+    @begin_end()
     def setup(self) -> None:
         """Setup the instance"""
-        debug.lv2('Starting method...')
         start = datetime.now(timezone.utc)
         # If we build self.plan here, then we can modify settings before setup()
         self.plan = PlanBuilder(settings=self.settings).plan
@@ -219,13 +209,12 @@ class TestBed:
         self.setup_entitymgrs()
         end = datetime.now(timezone.utc)
         debug.lv1(f'Testbed setup elapsed time: {(end - start).total_seconds()}')
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def setup_entitymgrs(self) -> None:
         """
         Setup each EntityMgr child class
         """
-        debug.lv2('Starting method...')
         kw = {'client': self.client, 'plan': self.plan}
 
         self.ilmmgr = IlmMgr(**kw)
@@ -242,17 +231,16 @@ class TestBed:
         if self.plan.type == 'data_stream':
             self.data_streammgr = DataStreamMgr(**kw, snapmgr=self.snapshotmgr)
             self.data_streammgr.setup()
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def teardown(self) -> None:
         """Tear down anything we created"""
-        debug.lv2('Starting method...')
         start = datetime.now(timezone.utc)
         successful = True
         if self.plan.tmpdir:
             debug.lv3(f'Removing tmpdir: {self.plan.tmpdir}')
             rmtree(self.plan.tmpdir)  # Remove the tmpdir stored here
-        for kind, list_of_kind in self._fodder_generator():
+        for kind, list_of_kind in self._erase_all():
             if not self._erase(kind, list_of_kind):
                 successful = False
         persist = self.ilm_polling(interval=self.plan.ilm_polling_interval)
@@ -268,4 +256,3 @@ class TestBed:
         else:
             logger.error('Cleanup was unsuccessful/incomplete')
         self.plan.cleanup = successful
-        debug.lv3('Exiting method')

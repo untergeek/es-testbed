@@ -4,7 +4,7 @@ import typing as t
 import logging
 from pathlib import Path
 from json import loads
-from es_client.helpers.utils import get_yaml
+from es_client.utils import get_yaml
 from .scenarios import Scenarios
 
 logger = logging.getLogger(__name__)

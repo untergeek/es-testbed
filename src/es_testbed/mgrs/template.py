@@ -2,10 +2,10 @@
 
 import typing as t
 import logging
-import tiered_debug as debug
-from es_testbed.exceptions import ResultNotExpected
-from es_testbed.helpers.es_api import exists, put_idx_tmpl
-from es_testbed.mgrs.entity import EntityMgr
+from ..debug import debug, begin_end
+from ..exceptions import ResultNotExpected
+from ..es_api import exists, put_idx_tmpl
+from .entity import EntityMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -37,17 +37,16 @@ class TemplateMgr(EntityMgr):
         _.append(f"{self.get_pattern('data_stream')}*")
         return _
 
+    @begin_end()
     def get_pattern(self, kind: str) -> str:
         """Return the a formatted index search pattern string"""
-        debug.lv2('Starting method...')
         retval = f'{self.plan.prefix}-{self.ident(dkey=kind)}-{self.plan.uniq}'
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval
 
+    @begin_end()
     def setup(self) -> None:
         """Setup the entity manager"""
-        debug.lv2('Starting method...')
         ds = {} if self.plan.type == 'data_stream' else None
         put_idx_tmpl(
             self.client,
@@ -62,4 +61,3 @@ class TemplateMgr(EntityMgr):
             )
         self.appender(self.name)
         debug.lv3(f'Successfully created index template: {self.last}')
-        debug.lv3('Exiting method')

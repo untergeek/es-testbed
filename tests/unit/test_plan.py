@@ -1,11 +1,10 @@
 """Tests for es_testbed._plan module."""
 
+# pylint: disable=W0212
 from unittest.mock import patch
 import pytest
 from dotmap import DotMap
 from es_testbed._plan import PlanBuilder
-
-# pylint: disable=W0212
 
 
 def test_plan_builder_init(plan_builder, settings):

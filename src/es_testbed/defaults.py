@@ -3,31 +3,19 @@
 import typing as t
 
 EPILOG: str = 'Learn more at https://github.com/untergeek/es-testbed'
+"""Epilog for the Click CLI"""
 
 HELP_OPTIONS: dict = {'help_option_names': ['-h', '--help']}
-
-ARGSCLASSES: list = ['IlmBuilder', 'IlmExplain', 'TestPlan']
+"""Default help options for Click commands"""
 
 COLD_PREFIX: str = 'restored-'
+"""Prefix for cold searchable snapshot indices"""
+
 FROZEN_PREFIX: str = 'partial-'
+"""Prefix for frozen searchable snapshot indices"""
 
 SS_PREFIX: t.Dict[str, str] = {'cold': COLD_PREFIX, 'frozen': FROZEN_PREFIX}
-
-MAPPING: dict = {
-    'properties': {
-        '@timestamp': {'type': 'date'},
-        'message': {'type': 'keyword'},
-        'number': {'type': 'long'},
-        'nested': {'properties': {'key': {'type': 'keyword'}}},
-        'deep': {
-            'properties': {
-                'l1': {
-                    'properties': {'l2': {'properties': {'l3': {'type': 'keyword'}}}}
-                }
-            }
-        },
-    }
-}
+"""Dictionary of prefixes for searchable snapshot indices"""
 
 NAMEMAPPER: t.Dict[str, str] = {
     'index': 'idx',
@@ -38,14 +26,18 @@ NAMEMAPPER: t.Dict[str, str] = {
     'template': 'tmpl',
     'snapshot': 'snp',
 }
+"""Mapping of names to abbreviations for use in the CLI"""
 
 PAUSE_DEFAULT: str = '1.0'
+"""Default value for the pause time in seconds"""
 PAUSE_ENVVAR: str = 'ES_TESTBED_PAUSE'
+"""Environment variable for the pause time"""
 
 PLURALMAP: t.Dict[str, str] = {
     'ilm': 'ILM Policies',
     'index': 'indices',
 }
+"""Mapping of singular to plural names for use in the CLI"""
 
 TESTPLAN: dict = {
     'type': 'indices',
@@ -77,9 +69,12 @@ TIER: dict = {
         'storage': 'shared_cache',
     },
 }
+"""Default values for the ILM tiers"""
 
 TIMEOUT_DEFAULT: str = '30'
+"""Default timeout for the testbed in seconds"""
 TIMEOUT_ENVVAR: str = 'ES_TESTBED_TIMEOUT'
+"""Environment variable for the testbed timeout"""
 
 # Define IlmPhase as a typing alias to be reused multiple times
 #
@@ -97,6 +92,7 @@ TIMEOUT_ENVVAR: str = 'ES_TESTBED_TIMEOUT'
 IlmPhase = t.Dict[
     str, t.Union[str, t.Dict[str, str], t.Dict[str, t.Dict[str, t.Dict[str, str]]]]
 ]
+"""ILM Phase type alias"""
 
 
 def ilmhot() -> IlmPhase:

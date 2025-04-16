@@ -3,9 +3,9 @@
 import typing as t
 import logging
 from dotmap import DotMap
-import tiered_debug as debug
-from es_testbed.defaults import TESTPLAN
-from es_testbed.helpers.utils import build_ilm_policy, prettystr, randomstr
+from .debug import debug, begin_end
+from .defaults import TESTPLAN
+from .utils import build_ilm_policy, prettystr, randomstr
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +114,8 @@ class PlanBuilder:
         """Return the Plan"""
         return self._plan
 
+    @begin_end()
     def _create_lists(self) -> None:
-        debug.lv2('Starting method...')
         names = [
             'indices',
             'data_stream',
@@ -126,11 +126,10 @@ class PlanBuilder:
         ]
         for name in names:
             self._plan[name] = []
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def setup(self) -> None:
         """Do initial setup of the Plan DotMap"""
-        debug.lv2('Starting method...')
         self._plan.uniq = randomstr(length=8, lowercase=True)
         self._create_lists()
         self.update(self.settings)  # Override with settings.
@@ -138,18 +137,16 @@ class PlanBuilder:
         debug.lv3('Rollover alias updated')
         self.update_ilm()
         debug.lv5(f'FINAL PLAN: {prettystr(self._plan.toDict())}')
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def update(self, settings: t.Dict) -> None:
         """Update the Plan DotMap"""
-        debug.lv2('Starting method...')
         self._plan.update(DotMap(settings))
         debug.lv5(f'Updated plan: {prettystr(self._plan.toDict())}')
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def update_ilm(self) -> None:
         """Update the ILM portion of the Plan DotMap"""
-        debug.lv2('Starting method...')
         setdefault = False
         if 'ilm' not in self._plan:
             debug.lv3('key "ilm" is not in plan')
@@ -194,14 +191,12 @@ class PlanBuilder:
             }
             debug.lv5(f'KWARGS = {kwargs}')
             self._plan.ilm.policy = build_ilm_policy(**kwargs)
-            debug.lv3('Exiting method')
 
+    @begin_end()
     def update_rollover_alias(self) -> None:
         """Update the Rollover Alias value"""
-        debug.lv2('Starting method...')
         if self._plan.rollover_alias:
             self._plan.rollover_alias = f'{self._plan.prefix}-idx-{self._plan.uniq}'
         else:
             self._plan.rollover_alias = None
         debug.lv5(f'Updated rollover_alias = {self._plan.rollover_alias}')
-        debug.lv3('Exiting method')

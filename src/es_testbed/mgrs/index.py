@@ -3,12 +3,12 @@
 import typing as t
 import logging
 from importlib import import_module
-import tiered_debug as debug
-from es_testbed.entities import Alias, Index
-from es_testbed.helpers.es_api import create_index, fill_index
-from es_testbed.helpers.utils import prettystr
-from es_testbed.mgrs.entity import EntityMgr
-from es_testbed.mgrs.snapshot import SnapshotMgr
+from ..debug import debug, begin_end
+from ..entities import Alias, Index
+from ..es_api import create_index, fill_index
+from ..utils import prettystr
+from .entity import EntityMgr
+from .snapshot import SnapshotMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -47,9 +47,9 @@ class IndexMgr(EntityMgr):
             return self.plan.ilm_policies[-1]
         return None
 
+    @begin_end()
     def _rollover_path(self) -> None:
         """This is the execution path for rollover indices"""
-        debug.lv2('Starting method...')
         if not self.entity_list:
             acfg = {self.plan.rollover_alias: {'is_write_index': True}}
             debug.lv5(f'Creating index with config: {acfg}')
@@ -62,25 +62,33 @@ class IndexMgr(EntityMgr):
                 kw = {'phase': 'hot', 'action': 'complete', 'name': 'complete'}
                 debug.lv5(f'Advancing ILM policy with config: {kw}')
                 self.last.ilm_tracker.advance(**kw)
-        debug.lv3('Exiting method')
 
-    def add(self, value) -> None:
+    @begin_end()
+    def add(
+        self,
+        name: str,
+        mappings: t.Optional[t.Dict] = None,
+        settings: t.Optional[t.Dict] = None,
+    ) -> None:
         """Create a single index"""
-        debug.lv2('Starting method...')
-        debug.lv1(f'Creating index: "{value}"')
-        create_index(self.client, value)
-        debug.lv3('Exiting method')
+        mapvals = mappings['mappings'] or None
+        setvals = settings['settings']['index'] or None
+        debug.lv1(f'Creating index: "{name}"')
+        debug.lv5(f'-- with settings: {settings}')
+        debug.lv5(f'-- with mappings: {mappings}')
+        create_index(self.client, name, mappings=mapvals, settings=setvals)
 
+    @begin_end()
     def add_indices(self) -> None:
         """Add indices according to plan"""
-        debug.lv2('Starting method...')
+        args = import_module(f'{self.plan.modpath}.definitions')
         mod = import_module(f'{self.plan.modpath}.functions')
         func = getattr(mod, 'doc_generator')
         for scheme in self.plan.index_buildlist:
             if self.plan.rollover_alias:
                 self._rollover_path()
             else:
-                self.add(self.name)
+                self.add(self.name, mappings=args.mappings(), settings=args.settings())
             # self.filler(scheme)
             fill_index(
                 self.client,
@@ -96,36 +104,33 @@ class IndexMgr(EntityMgr):
                     f'Unable to confirm rollover of alias '
                     f'"{self.plan.rollover_alias}" was successful'
                 )
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def searchable(self) -> None:
         """If the indices were marked as searchable snapshots, we do that now"""
-        debug.lv2('Starting method...')
         for idx, scheme in enumerate(self.plan.index_buildlist):
             if scheme['target_tier'] in ['cold', 'frozen']:
                 self.entity_list[idx].mount_ss(scheme)
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def setup(self) -> None:
         """Setup the entity manager"""
-        debug.lv2('Starting method...')
         debug.lv5(f'PLAN: {prettystr(self.plan.toDict())}')
         if self.plan.rollover_alias:
             debug.lv3('rollover_alias is True...')
         self.add_indices()
         self.searchable()
         logger.info(f'Successfully created indices: {prettystr(self.indexlist)}')
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def track_alias(self) -> None:
         """Track a rollover alias"""
-        debug.lv2('Starting method...')
         debug.lv3(f'Tracking alias: {self.plan.rollover_alias}')
         self.alias = Alias(client=self.client, name=self.plan.rollover_alias)
 
+    @begin_end()
     def track_index(self, name: str) -> None:
         """Track an index and append that tracking entity to entity_list"""
-        debug.lv2('Starting method...')
         debug.lv3(f'Tracking index: {name}')
         entity = Index(
             client=self.client,
@@ -135,4 +140,3 @@ class IndexMgr(EntityMgr):
         )
         entity.track_ilm(self.name)
         self.entity_list.append(entity)
-        debug.lv3('Exiting method')
