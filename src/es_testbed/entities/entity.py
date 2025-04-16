@@ -39,9 +39,3 @@ class Entity:
         retval = bool(self.name == find_write_index(self.client, self.name))
         debug.lv5(f'Return value = {retval}')
         return retval
-
-    def set_debug_tier(self, tier: int) -> None:
-        """
-        Set the debug tier globally for this module
-        """
-        debug.level = tier

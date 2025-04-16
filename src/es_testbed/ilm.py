@@ -310,13 +310,6 @@ class IlmTracker:
         return res['indices'][0]['name']
 
     @begin_end()
-    def set_debug_tier(self, tier: int) -> None:
-        """
-        Set the debug tier globally for this module
-        """
-        debug.level = tier
-
-    @begin_end()
     def update(self) -> None:
         """Update self._explain with the latest from :py:meth:`get_explain_data`"""
         try:
