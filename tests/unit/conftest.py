@@ -10,6 +10,7 @@ from elastic_transport import ApiResponseMeta
 from elasticsearch8.exceptions import NotFoundError
 from es_testbed._base import TestBed
 from es_testbed._plan import PlanBuilder
+from es_testbed.debug import debug
 from es_testbed.defaults import (
     ilmhot,
     ilmwarm,
@@ -23,6 +24,8 @@ from es_testbed.ilm import IlmTracker
 from . import forcemerge, searchable, ALIAS, INDEX1, INDICES, REPO, TIERS, TREPO
 
 logger = logging.getLogger(__name__)
+
+debug.level = 5  # Set the debug level to 5 for all tests
 
 FMAP: t.Dict[str, t.Dict] = {
     'hot': ilmhot(),

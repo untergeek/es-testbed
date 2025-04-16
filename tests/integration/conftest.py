@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from elasticsearch8.exceptions import NotFoundError
 from es_client import Builder
 from es_client.helpers.logging import set_logging
+from es_wait.debug import debug as wait_debug
+from es_testbed.debug import debug
 from es_testbed.defaults import NAMEMAPPER
 from es_testbed.helpers.es_api import get_ds_current, get_write_index
 
@@ -19,6 +21,9 @@ LOCALREPO = 'testing'
 PROJ = path.abspath(path.join(path.dirname(__file__), '..'))
 ENVPATH = path.join(PROJ, '.env')
 print(f'ENVPATH: {ENVPATH}')
+
+debug.level = 5  # Set the debug level to 5 for all tests
+wait_debug.level = debug.level  # Set the wait_debug level to match the debug level
 
 
 class Index4Test:

@@ -2,11 +2,11 @@
 
 import typing as t
 import logging
-import tiered_debug as debug
-from es_testbed.exceptions import ResultNotExpected
-from es_testbed.helpers.es_api import exists, put_ilm
-from es_testbed.helpers.utils import build_ilm_policy
-from es_testbed.mgrs.entity import EntityMgr
+from ..debug import debug, begin_end
+from ..es_api import exists, put_ilm
+from ..exceptions import ResultNotExpected
+from ..utils import build_ilm_policy
+from .entity import EntityMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -31,9 +31,9 @@ class IlmMgr(EntityMgr):
         super().__init__(client=client, plan=plan)
         debug.lv3('IlmMgr object initialized')
 
+    @begin_end()
     def get_policy(self) -> t.Dict:
         """Return the configured ILM policy"""
-        debug.lv2('Starting method...')
         d = self.plan.ilm
         kwargs = {
             'phases': d.phases,
@@ -43,13 +43,12 @@ class IlmMgr(EntityMgr):
             'repository': self.plan.repository,
         }
         retval = build_ilm_policy(**kwargs)
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval
 
+    @begin_end()
     def setup(self) -> None:
         """Setup the entity manager"""
-        debug.lv2('Starting method...')
         if self.plan.ilm.enabled:
             if not self.plan.ilm.policy:  # If you've put a full policy there...
                 self.plan.ilm.policy = self.get_policy()
@@ -66,4 +65,3 @@ class IlmMgr(EntityMgr):
         else:
             self.appender(None)  # This covers self.plan.ilm_policies[-1]
             logger.info('No ILM policy created.')
-        debug.lv3('Exiting method')

@@ -5,23 +5,23 @@ import logging
 from os import getenv
 import time
 from dotmap import DotMap
-import tiered_debug as debug
 from es_wait import IlmPhase, IlmStep
 from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
-from es_testbed.defaults import (
+from .debug import debug, begin_end
+from .defaults import (
     PAUSE_ENVVAR,
     PAUSE_DEFAULT,
     TIMEOUT_DEFAULT,
     TIMEOUT_ENVVAR,
 )
-from es_testbed.exceptions import (
+from .exceptions import (
     NameChanged,
     ResultNotExpected,
     TestbedMisconfig,
     TestbedFailure,
 )
-from es_testbed.helpers.es_api import get_ilm_phases, ilm_explain, ilm_move, resolver
-from es_testbed.helpers.utils import prettystr
+from .es_api import get_ilm_phases, ilm_explain, ilm_move, resolver
+from .utils import prettystr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -90,11 +90,11 @@ class IlmTracker:
         debug.lv3(f'ILM Explain Index: {self._explain.index}')
         debug.lv2(f'Index "{self.name}" now on phase "{phase}"')
 
+    @begin_end()
     def _phase_wait(
         self, phase: str, pause: float = PAUSE_VALUE, timeout: float = TIMEOUT_VALUE
     ) -> None:
         """Wait until the new phase shows up in ILM Explain"""
-        debug.lv2('Starting method...')
         kw = {'name': self.name, 'phase': phase, 'pause': pause, 'timeout': timeout}
         debug.lv5(f'Waiting for phase args = {prettystr(kw)}')
         phasechk = IlmPhase(self.client, **kw)
@@ -112,16 +112,15 @@ class IlmTracker:
             msg = f'{wait.message}. Total elapsed time: {wait.elapsed}.'
             logger.error(msg)
             raise TestbedFailure(msg) from wait
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def _ssphz(self, phase: str) -> bool:
         """Return True if the phase is for searchable snapshots (> 'warm')"""
-        debug.lv2('Starting method...')
         retval = bool(self.pnum(phase) > self.pnum('warm'))
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval
 
+    @begin_end()
     def advance(
         self,
         phase: t.Optional[str] = None,
@@ -129,10 +128,9 @@ class IlmTracker:
         name: t.Optional[str] = None,
     ) -> None:
         """Advance index to next ILM phase"""
-        debug.lv2('Starting method...')
         if self._explain.phase == 'delete':
             debug.lv1('Already on "delete" phase. No more phases to advance')
-            debug.lv3('Exiting method')
+
             return
 
         debug.lv3(f'current_step: {prettystr(self.current_step())}')
@@ -158,7 +156,7 @@ class IlmTracker:
         if phase == 'hot':
             self._log_phase(phase)
             debug.lv5('Phase "hot" reached, and all steps are completed')
-            debug.lv3('Exiting method')
+
             return
 
         # Remaining phases could be warm through frozen
@@ -190,8 +188,8 @@ class IlmTracker:
         else:
             debug.lv3(f'Already on "{phase}" phase. No need to advance')
             debug.lv5(f'current_step: {prettystr(self.current_step())}')
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def current_step(self) -> t.Dict[str, str]:
         """Return the current ILM step information
 
@@ -200,24 +198,22 @@ class IlmTracker:
         latter expects a 'name' key. This property returns a dictionary for
         use with the ILM Move API, so that the 'step' key is renamed to 'name'.
         """
-        debug.lv2('Starting method...')
         retval = {
             'phase': self._explain.phase,
             'action': self._explain.action,
             'name': self._explain.step,
         }
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {prettystr(retval)}')
+        debug.lv5(f'Return value = {prettystr(retval)}')
         return retval
 
+    @begin_end()
     def get_explain_data(self) -> t.Dict:
         """Get the ILM explain data and return it"""
-        debug.lv2('Starting method...')
         try:
             debug.lv4('TRY: Getting ILM explain data')
             retval = ilm_explain(self.client, self.name)
-            debug.lv3('Exiting method, returning value')
-            debug.lv5(f'Value = {prettystr(retval)}')
+
+            debug.lv5(f'Return value = {prettystr(retval)}')
             return retval
         except NameChanged as err:
             debug.lv3('Exiting method, raising exception')
@@ -230,9 +226,9 @@ class IlmTracker:
             logger.critical(msg)
             raise err
 
+    @begin_end()
     def next_phase(self) -> str:
         """Return the next phase in the index's ILM journey"""
-        debug.lv2('Starting method...')
         retval = None
         if self._explain.phase == 'delete':
             debug.lv3('Already on "delete" phase. No more phases to advance')
@@ -246,10 +242,10 @@ class IlmTracker:
             if remaining:  # If any:
                 retval = self.pname(remaining[0])
                 # Get the phase name from the number stored in the first element
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval
 
+    @begin_end()
     def next_step(
         self,
         phase: t.Optional[str] = None,
@@ -263,7 +259,6 @@ class IlmTracker:
         latter expects a 'name' key. This property returns a dictionary for
         use with the ILM Move API, so that the 'step' key is renamed to 'name'.
         """
-        debug.lv2('Starting method...')
         err1 = bool((action is not None) and (name is None))
         err2 = bool((action is None) and (name is not None))
         if err1 or err2:
@@ -279,29 +274,26 @@ class IlmTracker:
         if action:
             retval['action'] = action
             retval['name'] = name
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {prettystr(retval)}')
+        debug.lv5(f'Return value = {prettystr(retval)}')
         return retval
 
+    @begin_end()
     def pnum(self, phase: str) -> int:
         """Map a phase name to a phase number"""
-        debug.lv2('Starting method...')
         _ = {'new': 0, 'hot': 1, 'warm': 2, 'cold': 3, 'frozen': 4, 'delete': 5}
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {_[phase]}')
+        debug.lv5(f'Return value = {_[phase]}')
         return _[phase]
 
+    @begin_end()
     def pname(self, num: int) -> str:
         """Map a phase number to a phase name"""
-        debug.lv2('Starting method...')
         _ = {0: 'new', 1: 'hot', 2: 'warm', 3: 'cold', 4: 'frozen', 5: 'delete'}
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {_[num]}')
+        debug.lv5(f'Return value = {_[num]}')
         return _[num]
 
+    @begin_end()
     def resolve(self, name: str) -> str:
         """Resolve that we have an index and NOT an alias or a datastream"""
-        debug.lv2('Starting method...')
         res = resolver(self.client, name)
         debug.lv5(f'resolver: result = {res}')
         if len(res['aliases']) > 0 or len(res['data_streams']) > 0:
@@ -314,19 +306,19 @@ class IlmTracker:
             msg = f'{name} resolved to multiple indices: {prettystr(res["indices"])}'
             logger.critical(msg)
             raise ResultNotExpected(msg)
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {res["indices"][0]["name"]}')
+        debug.lv5(f'Return value = {res["indices"][0]["name"]}')
         return res['indices'][0]['name']
 
+    @begin_end()
     def set_debug_tier(self, tier: int) -> None:
         """
         Set the debug tier globally for this module
         """
-        debug.set_level(tier)
+        debug.level = tier
 
+    @begin_end()
     def update(self) -> None:
         """Update self._explain with the latest from :py:meth:`get_explain_data`"""
-        debug.lv2('Starting method...')
         try:
             debug.lv4('TRY: self._explain = DotMap(self.get_explain_data())')
             self._explain = DotMap(self.get_explain_data())
@@ -336,18 +328,17 @@ class IlmTracker:
             debug.lv3('Passing along upstream exception...')
             debug.lv5(f'Exception = {prettystr(err)}')
             raise err
-        debug.lv3('Exiting method')
 
+    @begin_end()
     def wait4complete(self) -> None:
         """Subroutine for waiting for an ILM step to complete"""
-        debug.lv2('Starting method...')
         phase_action = bool(self._explain.action == 'complete')
         phase_step = bool(self._explain.step == 'complete')
         if bool(phase_action and phase_step):
             debug.lv3(
                 f'{self.name}: Current step complete: {prettystr(self.current_step())}'
             )
-            debug.lv3('Exiting method')
+
             return
         debug.lv3(
             f'{self.name}: Current step not complete. {prettystr(self.current_step())}'
@@ -375,4 +366,3 @@ class IlmTracker:
             msg = f'{wait.message}. Total elapsed time: {wait.elapsed}.'
             logger.error(msg)
             raise TestbedFailure(msg) from wait
-        debug.lv3('Exiting method')

@@ -3,9 +3,9 @@
 # pylint: disable=C0115,C0116,R0902,R0904,R0913,R0917
 import typing as t
 import logging
-import tiered_debug as debug
-from es_testbed.entities.alias import Alias
-from es_testbed.helpers.es_api import get_backing_indices
+from ..debug import debug, begin_end
+from ..es_api import get_backing_indices
+from .alias import Alias
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -28,21 +28,19 @@ class DataStream(Alias):
         debug.lv3('DataStream entity object initialized')
 
     @property
+    @begin_end()
     def backing_indices(self):
         """Return the list of backing indices for the data_stream"""
-        debug.lv2('Starting method...')
         retval = get_backing_indices(self.client, self.name)
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval
 
+    @begin_end()
     def verify(self, index_list: t.Sequence[str]) -> bool:
         """Verify that the backing indices match ``index_list``"""
-        debug.lv2('Starting method...')
         retval = False
         if self.backing_indices == index_list:
             debug.lv3(f'Confirm match of data_stream "{self.name}" backing indices')
             retval = True
-        debug.lv3('Exiting method, returning value')
-        debug.lv5(f'Value = {retval}')
+        debug.lv5(f'Return value = {retval}')
         return retval

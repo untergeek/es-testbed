@@ -3,11 +3,11 @@
 import typing as t
 import logging
 from importlib import import_module
-import tiered_debug as debug
-from es_testbed.exceptions import ResultNotExpected
-from es_testbed.helpers.es_api import exists, put_comp_tmpl
-from es_testbed.helpers.utils import prettystr
-from es_testbed.mgrs.entity import EntityMgr
+from ..debug import debug, begin_end
+from ..es_api import exists, put_comp_tmpl
+from ..exceptions import ResultNotExpected
+from ..utils import prettystr
+from .entity import EntityMgr
 
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
@@ -32,6 +32,7 @@ class ComponentMgr(EntityMgr):
         debug.lv3('ComponentMgr object initialized')
 
     @property
+    @begin_end()
     def components(self) -> t.Sequence[t.Dict]:
         """Return a list of component template dictionaries"""
         retval = []
@@ -47,9 +48,9 @@ class ComponentMgr(EntityMgr):
         retval.append(preset.mappings())
         return retval
 
+    @begin_end()
     def setup(self) -> None:
         """Setup the entity manager"""
-        debug.lv2('Starting method...')
         for component in self.components:
             put_comp_tmpl(self.client, self.name, component)
             if not exists(self.client, self.kind, self.name):
@@ -61,4 +62,3 @@ class ComponentMgr(EntityMgr):
             f'Successfully created all component templates: '
             f'{prettystr(self.entity_list)}'
         )
-        debug.lv3('Exiting method')
