@@ -211,7 +211,7 @@ def process_preset(
     return modpath, tmpdir
 
 
-@begin_end()
+@begin_end(begin=5, end=5)
 def python_version() -> t.Tuple:
     """
     Return running Python version tuple, e.g. 3.12.2 would be (3, 12, 2)
