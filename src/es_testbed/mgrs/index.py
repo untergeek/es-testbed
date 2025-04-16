@@ -64,21 +64,31 @@ class IndexMgr(EntityMgr):
                 self.last.ilm_tracker.advance(**kw)
 
     @begin_end()
-    def add(self, value) -> None:
+    def add(
+        self,
+        name: str,
+        mappings: t.Optional[t.Dict] = None,
+        settings: t.Optional[t.Dict] = None,
+    ) -> None:
         """Create a single index"""
-        debug.lv1(f'Creating index: "{value}"')
-        create_index(self.client, value)
+        mapvals = mappings['mappings'] or None
+        setvals = settings['settings']['index'] or None
+        debug.lv1(f'Creating index: "{name}"')
+        debug.lv5(f'-- with settings: {settings}')
+        debug.lv5(f'-- with mappings: {mappings}')
+        create_index(self.client, name, mappings=mapvals, settings=setvals)
 
     @begin_end()
     def add_indices(self) -> None:
         """Add indices according to plan"""
+        args = import_module(f'{self.plan.modpath}.definitions')
         mod = import_module(f'{self.plan.modpath}.functions')
         func = getattr(mod, 'doc_generator')
         for scheme in self.plan.index_buildlist:
             if self.plan.rollover_alias:
                 self._rollover_path()
             else:
-                self.add(self.name)
+                self.add(self.name, mappings=args.mappings(), settings=args.settings())
             # self.filler(scheme)
             fill_index(
                 self.client,
