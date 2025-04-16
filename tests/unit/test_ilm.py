@@ -3,9 +3,11 @@
 # pylint: disable=C0115,C0116,R0903,R0913,R0917,W0212
 from os import getenv
 from unittest.mock import MagicMock, patch
+import logging
 import pytest
 from dotmap import DotMap
 from es_wait.exceptions import EsWaitTimeout, EsWaitFatal
+from es_testbed.debug import debug
 from es_testbed.defaults import (
     PAUSE_DEFAULT,
     PAUSE_ENVVAR,
@@ -444,61 +446,61 @@ def test_advance_from_new_to_hot(tracker_adv):
 
 def test_advance_beyond_hot_to_warm(tracker_adv, caplog):
     """Test advancing from 'hot' to 'warm' phase with step completion."""
-    caplog.set_level(10)
+    caplog.set_level(logging.DEBUG)
     start, end = 'hot', 'warm'
-    tracker_adv.set_debug_tier(3)
-    tracker_adv._explain.phase = start
+    with debug.change_level(3):
+        tracker_adv._explain.phase = start
+        with patch('es_testbed.es_api.ilm_move'), patch(
+            'es_testbed.ilm.IlmTracker.next_phase', return_value=end
+        ), patch.object(tracker_adv, "update"), patch.object(
+            tracker_adv, "wait4complete"
+        ), patch.object(
+            tracker_adv, "_phase_wait"
+        ):
 
-    with patch('es_testbed.es_api.ilm_move'), patch(
-        'es_testbed.ilm.IlmTracker.next_phase', return_value=end
-    ), patch.object(tracker_adv, "update"), patch.object(
-        tracker_adv, "wait4complete"
-    ), patch.object(
-        tracker_adv, "_phase_wait"
-    ):
-
-        assert tracker_adv.current_step()['phase'] == start
-        tracker_adv.advance(phase=end)
-        assert 'DEBUG3 Advancing to "warm" phase' in caplog.text
-    tracker_adv.set_debug_tier(1)
+            assert tracker_adv.current_step()['phase'] == start
+            tracker_adv.advance(phase=end)
+            assert 'DEBUG3 Advancing to "warm" phase' in caplog.text
 
 
 def test_advance_already_on_target_phase(tracker_adv, caplog):
     """Test that advance does nothing when already on the target phase."""
-    caplog.set_level(10)
+    caplog.set_level(logging.DEBUG)
     expected = 'warm'
     step = {'phase': expected, 'action': 'complete', 'name': 'complete'}
-    tracker_adv.set_debug_tier(3)
-    tracker_adv._explain.phase = expected
-    tracker_adv._explain.action = 'complete'
-    tracker_adv._explain.step = 'complete'
+    with debug.change_level(3):
+        tracker_adv._explain.phase = expected
+        tracker_adv._explain.action = 'complete'
+        tracker_adv._explain.step = 'complete'
 
-    with patch('es_testbed.es_api.ilm_move') as mock_ilm_move, patch(
-        'es_testbed.ilm.ilm_explain',
-        return_value={'phase': expected, 'action': 'complete', 'step': 'complete'},
-    ), patch('es_testbed.ilm.IlmTracker.current_step', return_value=step), patch.object(
-        tracker_adv, 'next_phase', return_value=expected
-    ), patch.object(
-        tracker_adv, "_phase_wait"
-    ) as mock_phase_wait, patch.object(
-        tracker_adv, "wait4complete"
-    ) as mock_wait4complete:
+        with patch('es_testbed.es_api.ilm_move') as mock_ilm_move, patch(
+            'es_testbed.ilm.ilm_explain',
+            return_value={'phase': expected, 'action': 'complete', 'step': 'complete'},
+        ), patch(
+            'es_testbed.ilm.IlmTracker.current_step', return_value=step
+        ), patch.object(
+            tracker_adv, 'next_phase', return_value=expected
+        ), patch.object(
+            tracker_adv, "_phase_wait"
+        ) as mock_phase_wait, patch.object(
+            tracker_adv, "wait4complete"
+        ) as mock_wait4complete:
 
-        tracker_adv.advance(phase=expected)
+            tracker_adv.advance(phase=expected)
 
-        # Assertions
-        mock_ilm_move.assert_not_called()
-        mock_phase_wait.assert_not_called()
-        mock_wait4complete.assert_called_once()
-        assert (
-            f'DEBUG3 Already on "{expected}" phase. No need to advance' in caplog.text
-        )
-        tracker_adv.set_debug_tier(1)
+            # Assertions
+            mock_ilm_move.assert_not_called()
+            mock_phase_wait.assert_not_called()
+            mock_wait4complete.assert_called_once()
+            assert (
+                f'DEBUG3 Already on "{expected}" phase. No need to advance'
+                in caplog.text
+            )
 
 
 def test_advance_phase_wait_error_handling(tracker_adv, caplog):
     """Test that exceptions from _phase_wait are propagated."""
-    caplog.set_level(10)
+    caplog.set_level(logging.DEBUG)
     tracker_adv._explain.phase = "hot"
 
     with patch('es_testbed.es_api.ilm_move'), patch.object(

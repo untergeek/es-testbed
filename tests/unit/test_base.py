@@ -2,8 +2,10 @@
 
 # pylint: disable=W0212
 from unittest.mock import MagicMock, patch
+import logging
 import pytest
 from es_testbed._base import TestBed
+from es_testbed.debug import debug
 from es_testbed.defaults import NAMEMAPPER
 from es_testbed.exceptions import ResultNotExpected
 
@@ -157,10 +159,10 @@ def test_while_failure(testbed):
 
 def test_get_ilm_polling_produces_debug_log(testbed, caplog):
     """Test get_ilm_polling produces debug log"""
-    testbed.set_debug_tier(5)
-    testbed.get_ilm_polling()
+    caplog.set_level(logging.DEBUG)
+    with debug.change_level(5):
+        testbed.get_ilm_polling()
     assert 'Cluster settings' in caplog.text
-    testbed.set_debug_tier(1)
 
 
 def test_get_ilm_polling_exception(testbed, caplog):
