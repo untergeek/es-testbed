@@ -402,7 +402,7 @@ def test_advance_already_on_delete_phase(tracker_adv):
     """
     tracker_adv._explain.phase = "delete"
 
-    with patch('es_testbed.helpers.es_api.ilm_move') as mock_ilm_move, patch.object(
+    with patch('es_testbed.es_api.ilm_move') as mock_ilm_move, patch.object(
         tracker_adv, "_phase_wait"
     ) as mock_phase_wait, patch.object(
         tracker_adv, "wait4complete"
@@ -425,7 +425,7 @@ def test_advance_from_new_to_hot(tracker_adv):
     """Test advancing from 'new' to 'hot' phase, only waiting for the phase."""
     tracker_adv._explain.phase = "new"
     expected = 'hot'
-    with patch('es_testbed.helpers.es_api.ilm_move') as mock_ilm_move, patch.object(
+    with patch('es_testbed.es_api.ilm_move') as mock_ilm_move, patch.object(
         tracker_adv, "_phase_wait"
     ) as mock_phase_wait, patch.object(
         tracker_adv, "wait4complete"
@@ -449,7 +449,7 @@ def test_advance_beyond_hot_to_warm(tracker_adv, caplog):
     tracker_adv.set_debug_tier(3)
     tracker_adv._explain.phase = start
 
-    with patch('es_testbed.helpers.es_api.ilm_move'), patch(
+    with patch('es_testbed.es_api.ilm_move'), patch(
         'es_testbed.ilm.IlmTracker.next_phase', return_value=end
     ), patch.object(tracker_adv, "update"), patch.object(
         tracker_adv, "wait4complete"
@@ -473,7 +473,7 @@ def test_advance_already_on_target_phase(tracker_adv, caplog):
     tracker_adv._explain.action = 'complete'
     tracker_adv._explain.step = 'complete'
 
-    with patch('es_testbed.helpers.es_api.ilm_move') as mock_ilm_move, patch(
+    with patch('es_testbed.es_api.ilm_move') as mock_ilm_move, patch(
         'es_testbed.ilm.ilm_explain',
         return_value={'phase': expected, 'action': 'complete', 'step': 'complete'},
     ), patch('es_testbed.ilm.IlmTracker.current_step', return_value=step), patch.object(
@@ -501,7 +501,7 @@ def test_advance_phase_wait_error_handling(tracker_adv, caplog):
     caplog.set_level(10)
     tracker_adv._explain.phase = "hot"
 
-    with patch('es_testbed.helpers.es_api.ilm_move'), patch.object(
+    with patch('es_testbed.es_api.ilm_move'), patch.object(
         tracker_adv, "_phase_wait"
     ) as mock_phase_wait, patch.object(
         tracker_adv, "wait4complete"

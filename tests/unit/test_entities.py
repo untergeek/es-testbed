@@ -1,5 +1,6 @@
 """Unit tests for es_testbed.entities module"""
 
+# pylint: disable=C0115,C0116,R0903,R0913,R0917,W0212
 from unittest.mock import MagicMock, patch
 import typing as t
 import re
@@ -10,7 +11,6 @@ from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
 from es_testbed.exceptions import TestbedFailure
 from . import ALIAS, INDEX1, INDICES, my_retval
 
-# pylint: disable=C0115,C0116,R0903,R0913,R0917,W0212
 
 ALIAS_FIXT: str = 'alias,idx_list,retval,expected'
 """CSV string of pytest.mark.parametrize fixtures for Alias tests."""

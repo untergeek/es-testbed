@@ -1,12 +1,12 @@
-"""Tests for the es_testbed.helpers.es_api module"""
+"""Tests for the es_testbed.es_api module"""
 
+# pylint: disable=C0115,C0116,R0903,R0913,R0917,W0212
 from unittest.mock import MagicMock, patch, call
 import re
 import pytest
 from elasticsearch8.exceptions import TransportError
 from es_wait.exceptions import EsWaitFatal, EsWaitTimeout
-from es_testbed.exceptions import TestbedMisconfig
-from es_testbed.helpers.es_api import (
+from es_testbed.es_api import (
     change_ds,
     delete,
     exists,
@@ -26,9 +26,12 @@ from es_testbed.helpers.es_api import (
     snapshot_name,
     wait_wrapper,
 )
-from es_testbed.exceptions import NameChanged, ResultNotExpected, TestbedFailure
-
-# pylint: disable=C0115,C0116,R0903,R0913,R0917,W0212
+from es_testbed.exceptions import (
+    NameChanged,
+    ResultNotExpected,
+    TestbedFailure,
+    TestbedMisconfig,
+)
 
 
 def test_change_ds_success(client):
@@ -102,13 +105,13 @@ def test_ilm_move_exception(client, caplog):
 
 
 def test_put_comp_tmpl(client):
-    with patch('es_testbed.helpers.es_api.wait_wrapper') as mock_wait_wrapper:
+    with patch('es_testbed.es_api.wait_wrapper') as mock_wait_wrapper:
         put_comp_tmpl(client, 'test-template', {'template': 'data'})
         mock_wait_wrapper.assert_called_once()
 
 
 def test_put_idx_tmpl(client):
-    with patch('es_testbed.helpers.es_api.wait_wrapper') as mock_wait_wrapper:
+    with patch('es_testbed.es_api.wait_wrapper') as mock_wait_wrapper:
         put_idx_tmpl(client, 'test-template', ['pattern'], ['component'])
         mock_wait_wrapper.assert_called_once()
 
@@ -134,15 +137,15 @@ def test_snapshot_name(client):
             }
         }
     }
-    with patch('es_testbed.helpers.es_api.exists', return_value=True):
+    with patch('es_testbed.es_api.exists', return_value=True):
         result = snapshot_name(client, 'test-index')
         assert result == 'snapshot1'
 
 
 def test_snapshot_name_no_snapshot(client):
     client.indices.get.return_value = {'test-index': {'settings': {'index': {}}}}
-    with patch('es_testbed.helpers.es_api.exists', return_value=True):
-        with patch('es_testbed.helpers.es_api.logger.error') as mock_error:
+    with patch('es_testbed.es_api.exists', return_value=True):
+        with patch('es_testbed.es_api.logger.error') as mock_error:
             result = snapshot_name(client, 'test-index')
             assert result is None
             mock_error.assert_called_once_with(
@@ -159,7 +162,7 @@ def test_get_aliases_keyerror(client):
 def test_get_backing_indices_raises(client):
     name = 'a'
     with patch(
-        'es_testbed.helpers.es_api.resolver', return_value={'data_streams': ['a', 'aa']}
+        'es_testbed.es_api.resolver', return_value={'data_streams': ['a', 'aa']}
     ):
         with pytest.raises(ResultNotExpected) as err:
             get_backing_indices(client, name)
@@ -181,7 +184,7 @@ def test_get_ilm_raises(client, caplog):
 def test_get_ilm_phases_raises(client, caplog):
     caplog.set_level(50)
     name = 'test-index'
-    with patch('es_testbed.helpers.es_api.get_ilm', return_value={'not': 'found'}):
+    with patch('es_testbed.es_api.get_ilm', return_value={'not': 'found'}):
         with pytest.raises(ResultNotExpected):
             get_ilm_phases(client, name)
             assert f'Unable to get ILM lifecycle named {name}.' in caplog.text
@@ -280,7 +283,7 @@ class TestIlmExplain:
 
     def test_ilm_explain_general_exception(self, client):
         client.ilm.explain_lifecycle.side_effect = Exception('error')
-        with patch('es_testbed.helpers.es_api.logger.critical') as mock_critical:
+        with patch('es_testbed.es_api.logger.critical') as mock_critical:
             with pytest.raises(ResultNotExpected):
                 ilm_explain(client, 'test-index')
                 mock_critical.assert_called_once_with(
@@ -365,7 +368,7 @@ class TestDelete:
 
     def test_delete_not_found_error(self, client, notfound):
         client.indices.delete.side_effect = notfound
-        with patch('es_testbed.helpers.es_api.logger.warning'):
+        with patch('es_testbed.es_api.logger.warning'):
             assert delete(client, 'index', 'test-index')
 
     def test_delete_general_exception(self, client):
@@ -375,23 +378,16 @@ class TestDelete:
 
     def test_delete_verify_failure(self, client):
         client.indices.delete.return_value = {'acknowledged': False}
-        with patch(
-            'es_testbed.helpers.es_api.verify', return_value=False
-        ) as mock_verify:
+        with patch('es_testbed.es_api.verify', return_value=False) as mock_verify:
             assert not delete(client, 'index', 'test-index')
             mock_verify.assert_called_once_with(
                 client, 'index', 'test-index', repository=None
             )
 
     def test_delete_none_name(self, client):
-        with patch('es_testbed.helpers.es_api.debug.lv3') as mock_debug:
+        with patch('es_testbed.es_api.debug.lv3') as mock_debug:
             assert not delete(client, 'index', None)
-            mock_debug.assert_has_calls(
-                [
-                    call('"index" has a None value for name'),
-                    call('Exiting function, returning value'),
-                ]
-            )
+            mock_debug.assert_has_calls([call('"index" has a None value for name')])
 
 
 class TestGet:

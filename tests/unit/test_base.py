@@ -1,12 +1,11 @@
 """Unit tests for the base module."""
 
+# pylint: disable=W0212
 from unittest.mock import MagicMock, patch
 import pytest
 from es_testbed._base import TestBed
 from es_testbed.defaults import NAMEMAPPER
 from es_testbed.exceptions import ResultNotExpected
-
-# pylint: disable=W0212
 
 
 def test_init(testbed):
@@ -80,18 +79,18 @@ def test_erase_failure(testbed):
         assert testbed._erase('index', ['test-index']) is False
 
 
-# def test_fodder_generator(testbed):
+# def test_erase_all(testbed):
 #     """Test fodder generator."""
 #     with patch('es_testbed._base.get', return_value=['test-index']):
-#         generator = testbed._fodder_generator()
+#         generator = testbed._erase_all()
 #         items = list(generator)
 #         assert len(items) == 6
 
 
-def test_fodder_generator(testbed_fodder):
-    """Test fodder generator for each kind with multiple entities"""
+def test_erase_all(testbed_fodder):
+    """Test _erase_all generator for each kind with multiple entities"""
     with patch('es_testbed._base.get', return_value=['entity1', 'entity2']) as mock_get:
-        generator = testbed_fodder._fodder_generator()
+        generator = testbed_fodder._erase_all()
         items = list(generator)
         assert len(items) == 6
         for kind, entities in items:
@@ -116,15 +115,15 @@ def test_fodder_generator(testbed_fodder):
             )
 
 
-def test_fodder_generator_no_repository(testbed_fodder):
+def test_erase_all_no_repository(testbed_fodder):
     """
-    Test fodder generator when no repository is set with each kind
+    Test _erase_all generator when no repository is set with each kind
     with multiple entities
     """
     testbed_fodder.plan.repository = None
     with patch('es_testbed._base.get', return_value=['entity1', 'entity2']) as mock_get:
         with patch('es_testbed._base.debug.lv4') as mock_debug:
-            generator = testbed_fodder._fodder_generator()
+            generator = testbed_fodder._erase_all()
             items = list(generator)
             assert len(items) == 5  # 'snapshot' should be skipped
             for kind, entities in items:
@@ -217,7 +216,7 @@ def test_setup(testbed):
 def test_teardown(testbed):
     """Test teardown method."""
     with patch(
-        'es_testbed._base.TestBed._fodder_generator',
+        'es_testbed._base.TestBed._erase_all',
         return_value=[('index', ['test-index'])],
     ):
         with patch('es_testbed._base.TestBed._erase', return_value=True):
@@ -233,7 +232,7 @@ def test_teardown(testbed):
 def test_teardown_not_successful(testbed):
     """Test teardown method when cleanup is not successful."""
     with patch(
-        'es_testbed._base.TestBed._fodder_generator',
+        'es_testbed._base.TestBed._erase_all',
         return_value=[('index', ['test-index'])],
     ):
         with patch('es_testbed._base.TestBed._erase', return_value=False):

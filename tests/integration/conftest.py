@@ -10,11 +10,11 @@ import pytest
 from dotenv import load_dotenv
 from elasticsearch8.exceptions import NotFoundError
 from es_client import Builder
-from es_client.helpers.logging import set_logging
+from es_client.logging import set_logging
 from es_wait.debug import debug as wait_debug
 from es_testbed.debug import debug
 from es_testbed.defaults import NAMEMAPPER
-from es_testbed.helpers.es_api import get_ds_current, get_write_index
+from es_testbed.es_api import get_ds_current, get_write_index
 
 LOGLEVEL = 'DEBUG'
 LOCALREPO = 'testing'
