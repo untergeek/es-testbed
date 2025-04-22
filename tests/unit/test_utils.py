@@ -30,27 +30,27 @@ def test_build_ilm_phase_defaults(builtphase, tiers, tiertestval, trepo):
 
 
 def test_build_ilm_phase_add_action():
-    expected = {'read_only': {}}
-    phase = 'warm'
-    assert build_ilm_phase(phase, actions=expected)[phase]['actions'] == expected
+    expected = {"read_only": {}}
+    phase = "warm"
+    assert build_ilm_phase(phase, actions=expected)[phase]["actions"] == expected
 
 
 def test_build_ilm_phase_fail_repo(builtphase):
     with pytest.raises(TestbedMisconfig):
-        builtphase('cold', repo=None)
+        builtphase("cold", repo=None)
 
 
 def test_build_ilm_policy_no_phase():
     expected = {
-        'phases': {
-            'hot': {
-                'actions': {
-                    'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'}
+        "phases": {
+            "hot": {
+                "actions": {
+                    "rollover": {"max_age": "1d", "max_primary_shard_size": "1gb"}
                 }
             },
-            'delete': {
-                'actions': {'delete': {}},
-                'min_age': '5d',
+            "delete": {
+                "actions": {"delete": {}},
+                "min_age": "5d",
             },
         }
     }
@@ -61,9 +61,9 @@ def test_build_ilm_policy_no_phase():
 def test_build_ilm_policy(repo_val, tiertestval, trepo):
     # 3 tests building different ILM policies with different tiers
     tgroups = [
-        ['hot', 'delete'],
-        ['hot', 'frozen', 'delete'],
-        ['hot', 'cold', 'delete'],
+        ["hot", "delete"],
+        ["hot", "frozen", "delete"],
+        ["hot", "cold", "delete"],
     ]
     # Each tier group corresponds to a forcemerge plan by list index, with each index a
     # tuple for forcemerge True/False and max_num_segment count
@@ -72,78 +72,78 @@ def test_build_ilm_policy(repo_val, tiertestval, trepo):
         phases = {}  # Build out the phase dict for each scenario
         fm, mns = fmerge[idx]  # Extract whether to use forcemerge by index/tuple
         for tier in tgrp:  # Iterate over each tier in the testing scenario
-            kwargs = {'fm': fm} if tier in ['cold', 'frozen'] else {}
+            kwargs = {"fm": fm} if tier in ["cold", "frozen"] else {}
             phases.update(
                 tiertestval(tier, repo=trepo[tier], **kwargs)
             )  # Update with values per tier
         if fm:  # If we're doing forcemerge
-            phases['hot']['actions'].update(
+            phases["hot"]["actions"].update(
                 forcemerge(fm=fm, mns=mns)
             )  # Update the hot tier
         # To keep the line more readable, build the kwargs as a dict first
-        kwargs = {'repository': repo_val, 'forcemerge': fm, 'max_num_segments': mns}
+        kwargs = {"repository": repo_val, "forcemerge": fm, "max_num_segments": mns}
         # Then pass it as **kwargs
-        assert build_ilm_policy(tgrp, **kwargs) == {'phases': phases}
+        assert build_ilm_policy(tgrp, **kwargs) == {"phases": phases}
         # Our policy is easier to build at the last minute rather than constantly
         # passing dict['phases']['tier']
 
 
 def test_build_ilm_policy_read_only():
-    expected = {'warm': {'min_age': '2d', 'actions': {'readonly': {}}}}
+    expected = {"warm": {"min_age": "2d", "actions": {"readonly": {}}}}
     # To keep the line more readable, build the kwargs as a dict first
-    kwargs = {'readonly': 'warm'}
+    kwargs = {"readonly": "warm"}
     # Then pass it as **kwargs
-    assert build_ilm_policy(['warm'], **kwargs) == {'phases': expected}
+    assert build_ilm_policy(["warm"], **kwargs) == {"phases": expected}
 
 
 def test_build_ilm_policy_fail_repo():
     with pytest.raises(TestbedMisconfig):
-        build_ilm_policy(['hot', 'frozen'], repository=None)
+        build_ilm_policy(["hot", "frozen"], repository=None)
 
 
 def test_process_preset_builtin():
-    modpath, tmpdir = process_preset(builtin='builtin', path=None, ref=None, url=None)
-    assert modpath == 'es_testbed.presets.builtin'
+    modpath, tmpdir = process_preset(builtin="builtin", path=None, ref=None, url=None)
+    assert modpath == "es_testbed.presets.builtin"
     assert tmpdir is None
 
 
 def test_process_preset_path():
-    with patch('es_testbed.utils.Path') as mock_path:
+    with patch("es_testbed.utils.Path") as mock_path:
         mock_path.return_value.resolve.return_value.is_dir.return_value = True
-        mock_path.return_value.resolve.return_value.name = 'path'
+        mock_path.return_value.resolve.return_value.name = "path"
         modpath, tmpdir = process_preset(
-            builtin=None, path='some/path', ref=None, url=None
+            builtin=None, path="some/path", ref=None, url=None
         )
-        assert modpath == 'path'
+        assert modpath == "path"
         assert tmpdir is None
 
 
 def test_process_preset_git():
-    with patch('es_testbed.utils.Repo.clone_from') as mock_clone:
-        with patch('es_testbed.utils.mkdtemp', return_value='/tmp/dir'):
-            with patch('es_testbed.utils.Path') as mock_path:
+    with patch("es_testbed.utils.Repo.clone_from") as mock_clone:
+        with patch("es_testbed.utils.mkdtemp", return_value="/tmp/dir"):
+            with patch("es_testbed.utils.Path") as mock_path:
                 mock_path.return_value.resolve.return_value.is_dir.return_value = True
-                mock_path.return_value.resolve.return_value.name = 'dir'
+                mock_path.return_value.resolve.return_value.name = "dir"
                 modpath, tmpdir = process_preset(
                     builtin=None,
-                    path='some/path',
-                    ref='main',
-                    url='https://github.com/repo.git',
+                    path="some/path",
+                    ref="main",
+                    url="https://github.com/repo.git",
                 )
-                assert modpath == 'dir'
-                assert tmpdir == '/tmp/dir'
+                assert modpath == "dir"
+                assert tmpdir == "/tmp/dir"
                 mock_clone.assert_called_once_with(
-                    'https://github.com/repo.git', '/tmp/dir', branch='main', depth=1
+                    "https://github.com/repo.git", "/tmp/dir", branch="main", depth=1
                 )
 
 
 def test_process_preset_invalid_path():
-    with patch('es_testbed.utils.Path') as mock_path:
+    with patch("es_testbed.utils.Path") as mock_path:
         mock_path.return_value.resolve.return_value.is_dir.return_value = False
         with pytest.raises(
             ValueError, match='The provided path "invalid/path" is not a directory'
         ):
-            process_preset(builtin=None, path='invalid/path', ref=None, url=None)
+            process_preset(builtin=None, path="invalid/path", ref=None, url=None)
 
 
 def test_python_version():
@@ -164,28 +164,28 @@ def test_randomstr():
 
 
 def test_prettystr():
-    data = {'key': 'value'}
+    data = {"key": "value"}
     result = prettystr(data)
     assert isinstance(result, str)
-    assert 'key' in result
-    assert 'value' in result
+    assert "key" in result
+    assert "value" in result
 
 
 def test_prettystr_with_kwargs():
-    data = {'key': 'value'}
+    data = {"key": "value"}
     result = prettystr(data, indent=4, width=100, sort_dicts=True)
     assert isinstance(result, str)
-    assert 'key' in result
-    assert 'value' in result
+    assert "key" in result
+    assert "value" in result
 
 
 def test_build_ilm_phase_hot():
     """Test building the 'hot' phase without additional actions."""
-    phase = 'hot'
+    phase = "hot"
     response = build_ilm_phase(phase)
     expected = {
         phase: {
-            'actions': {'rollover': {'max_age': '1d', 'max_primary_shard_size': '1gb'}}
+            "actions": {"rollover": {"max_age": "1d", "max_primary_shard_size": "1gb"}}
         }
     }
     assert response == expected
@@ -194,40 +194,40 @@ def test_build_ilm_phase_hot():
 def test_build_ilm_phase_warm_with_actions():
     """Test building the 'warm' phase with additional actions."""
     actions = {"allocate": {"number_of_replicas": 1}}
-    phase = build_ilm_phase('warm', actions=actions)
+    phase = build_ilm_phase("warm", actions=actions)
     assert phase == {
-        'warm': {'actions': {"allocate": {"number_of_replicas": 1}}, 'min_age': '2d'}
+        "warm": {"actions": {"allocate": {"number_of_replicas": 1}}, "min_age": "2d"}
     }
 
 
 def test_build_ilm_phase_cold_with_repo():
     """Test building the 'cold' phase with a repository."""
-    phase = build_ilm_phase('cold', repo='my-repo')
+    phase = build_ilm_phase("cold", repo="my-repo")
     assert phase == {
-        'cold': {
-            'actions': {
-                'searchable_snapshot': {
-                    'snapshot_repository': 'my-repo',
-                    'force_merge_index': False,
+        "cold": {
+            "actions": {
+                "searchable_snapshot": {
+                    "snapshot_repository": "my-repo",
+                    "force_merge_index": False,
                 }
             },
-            'min_age': '3d',
+            "min_age": "3d",
         }
     }
 
 
 def test_build_ilm_phase_frozen_with_fm():
     """Test building the 'frozen' phase with force merge enabled."""
-    phase = build_ilm_phase('frozen', repo='my-repo', fm=True)
+    phase = build_ilm_phase("frozen", repo="my-repo", fm=True)
     assert phase == {
-        'frozen': {
-            'actions': {
-                'searchable_snapshot': {
-                    'snapshot_repository': 'my-repo',
-                    'force_merge_index': True,
+        "frozen": {
+            "actions": {
+                "searchable_snapshot": {
+                    "snapshot_repository": "my-repo",
+                    "force_merge_index": True,
                 }
             },
-            'min_age': '4d',
+            "min_age": "4d",
         }
     }
 
@@ -235,14 +235,14 @@ def test_build_ilm_phase_frozen_with_fm():
 def test_build_ilm_phase_cold_without_repo():
     """Test that building 'cold' phase without a repository raises an exception."""
     with pytest.raises(TestbedMisconfig, match="Unable to build cold ILM phase"):
-        build_ilm_phase('cold')
+        build_ilm_phase("cold")
 
 
 @pytest.mark.parametrize(
-    'dt,tz,expected',
+    "dt,tz,expected",
     [
-        ((2023, 1, 1, 12, 0, 0), 'UTC', '2023-01-01T12:00:00Z'),
-        ((2023, 1, 1, 12, 0, 0), 1, '2023-01-01T12:00:00+01:00'),
+        ((2023, 1, 1, 12, 0, 0), "UTC", "2023-01-01T12:00:00Z"),
+        ((2023, 1, 1, 12, 0, 0), 1, "2023-01-01T12:00:00+01:00"),
     ],
     indirect=True,
 )
@@ -254,8 +254,8 @@ def test_iso8601_now(mock_datetime_now, fake_now, dt, tz, expected):
 
 
 @pytest.mark.parametrize(
-    'idx,tier,expected',
-    [('idx1', 'cold', 'restored-idx1'), ('idx1', 'frozen', 'partial-idx1')],
+    "idx,tier,expected",
+    [("idx1", "cold", "restored-idx1"), ("idx1", "frozen", "partial-idx1")],
     indirect=True,
 )
 def test_mounted_name(idx, tier, expected):
@@ -263,25 +263,25 @@ def test_mounted_name(idx, tier, expected):
     assert mounted_name(idx, tier) == expected
 
 
-@pytest.mark.parametrize('phase', ['cold', 'frozen'], indirect=True)
+@pytest.mark.parametrize("phase", ["cold", "frozen"], indirect=True)
 def test_storage_type(phase):
     """Test storage_type for tier."""
-    assert storage_type(phase) == TIER[phase]['storage']
+    assert storage_type(phase) == TIER[phase]["storage"]
 
 
-@patch('es_testbed.utils.TIER', {'hot': {'pref': 'data_hot'}})
+@patch("es_testbed.utils.TIER", {"hot": {"pref": "data_hot"}})
 def test_get_routing_known_tier():
     """Test routing for a known tier."""
-    result = get_routing('hot')
-    expected = {'index.routing.allocation.include._tier_preference': 'data_hot'}
+    result = get_routing("hot")
+    expected = {"index.routing.allocation.include._tier_preference": "data_hot"}
     assert result == expected, "Should return preference from TIER for known tier"
 
 
-@patch('es_testbed.utils.TIER', {})
+@patch("es_testbed.utils.TIER", {})
 def test_get_routing_unknown_tier():
     """Test routing for an unknown tier falls back to 'data_content'."""
-    result = get_routing('unknown')
-    expected = {'index.routing.allocation.include._tier_preference': 'data_content'}
+    result = get_routing("unknown")
+    expected = {"index.routing.allocation.include._tier_preference": "data_content"}
     assert result == expected, "Should fall back to 'data_content' for unknown tier"
 
 

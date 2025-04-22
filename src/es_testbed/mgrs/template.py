@@ -17,17 +17,17 @@ logger = logging.getLogger(__name__)
 class TemplateMgr(EntityMgr):
     """Index Template entity manager"""
 
-    kind = 'template'
-    listname = 'index_templates'
+    kind = "template"
+    listname = "index_templates"
 
     def __init__(
         self,
-        client: t.Union['Elasticsearch', None] = None,
-        plan: t.Union['DotMap', None] = None,
+        client: t.Union["Elasticsearch", None] = None,
+        plan: t.Union["DotMap", None] = None,
     ):
-        debug.lv2('Initializing TemplateMgr object...')
+        debug.lv2("Initializing TemplateMgr object...")
         super().__init__(client=client, plan=plan)
-        debug.lv3('TemplateMgr object initialized')
+        debug.lv3("TemplateMgr object initialized")
 
     @property
     def patterns(self) -> t.Sequence[str]:
@@ -40,14 +40,14 @@ class TemplateMgr(EntityMgr):
     @begin_end()
     def get_pattern(self, kind: str) -> str:
         """Return the a formatted index search pattern string"""
-        retval = f'{self.plan.prefix}-{self.ident(dkey=kind)}-{self.plan.uniq}'
-        debug.lv5(f'Return value = {retval}')
+        retval = f"{self.plan.prefix}-{self.ident(dkey=kind)}-{self.plan.uniq}"
+        debug.lv5(f"Return value = {retval}")
         return retval
 
     @begin_end()
     def setup(self) -> None:
         """Setup the entity manager"""
-        ds = {} if self.plan.type == 'data_stream' else None
+        ds = {} if self.plan.type == "data_stream" else None
         put_idx_tmpl(
             self.client,
             self.name,
@@ -57,7 +57,7 @@ class TemplateMgr(EntityMgr):
         )
         if not exists(self.client, self.kind, self.name):
             raise ResultNotExpected(
-                f'Unable to verify creation of index template {self.name}'
+                f"Unable to verify creation of index template {self.name}"
             )
         self.appender(self.name)
-        debug.lv3(f'Successfully created index template: {self.last}')
+        debug.lv3(f"Successfully created index template: {self.last}")

@@ -8,10 +8,10 @@ from .snapshot import SnapshotMgr
 from .template import TemplateMgr
 
 __all__ = [
-    'ComponentMgr',
-    'DataStreamMgr',
-    'IlmMgr',
-    'IndexMgr',
-    'SnapshotMgr',
-    'TemplateMgr',
+    "ComponentMgr",
+    "DataStreamMgr",
+    "IlmMgr",
+    "IndexMgr",
+    "SnapshotMgr",
+    "TemplateMgr",
 ]

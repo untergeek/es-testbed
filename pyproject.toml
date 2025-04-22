@@ -4,7 +4,7 @@ build-backend = 'hatchling.build'
 
 [project]
 name = 'es-testbed'
-authors = [{ name='Elastic', email='info@elastic.co' }]
+authors = [{ name='Aaron Mildenstein', email='aaron@mildensteins.com' }]
 dynamic = ['version']
 description = 'Library to help with building and tearing down indices, data streams, repositories and snapshots'
 license = { text='Apache-2.0' }
@@ -33,9 +33,9 @@ keywords = [
 dependencies = [
     'gitpython==3.1.43',
     'dotmap==1.3.30',
-    'es_client>=8.18.1',
-    'es-wait>=0.15.0',
-    'tiered_debug==1.2.1',
+    'es_client>=8.18.2',
+    'es-wait>=0.15.1',
+    'tiered_debug==1.3.0',
 ]
 
 [project.optional-dependencies]
@@ -46,7 +46,7 @@ test = [
     'pytest-cov',
     'pytest-dotenv',
 ]
-doc = ['sphinx', 'sphinx_rtd_theme']
+doc = ['furo>=2024.8.6']
 
 [tool.hatch.module]
 name = 'es-testbed'
@@ -108,7 +108,7 @@ all = [
 [tool.black]
 target-version = ['py38']
 line-length = 88
-skip-string-normalization = true
+skip-string-normalization = false
 include = '\.pyi?$'
 
 [tool.coverage.run]

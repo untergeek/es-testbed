@@ -23,7 +23,7 @@ from .mgrs import (
 if t.TYPE_CHECKING:
     from elasticsearch8 import Elasticsearch
 
-logger = logging.getLogger('es_testbed.TestBed')
+logger = logging.getLogger("es_testbed.TestBed")
 
 # pylint: disable=R0902,R0913,R0917
 
@@ -53,40 +53,40 @@ class TestBed:
 
     def __init__(
         self,
-        client: t.Optional['Elasticsearch'] = None,
+        client: t.Optional["Elasticsearch"] = None,
         builtin: t.Optional[str] = None,
         path: t.Optional[str] = None,
         ref: t.Optional[str] = None,
         url: t.Optional[str] = None,
         scenario: t.Optional[str] = None,
     ):
-        debug.lv2('Initializing TestBed object...')
+        debug.lv2("Initializing TestBed object...")
         #: The plan settings
         self.settings = None
 
         modpath, tmpdir = process_preset(builtin, path, ref, url)
         if modpath is None:
-            msg = 'Must define a preset'
+            msg = "Must define a preset"
             logger.critical(msg)
             raise ValueError(msg)
 
         try:
-            debug.lv4('TRY: Attempting to import preset module')
-            debug.lv5(f'preset module: {modpath}')
-            preset = import_module(f'{modpath}.definitions')
+            debug.lv4("TRY: Attempting to import preset module")
+            debug.lv5(f"preset module: {modpath}")
+            preset = import_module(f"{modpath}.definitions")
             self.settings = preset.get_plan(scenario)
         except ImportError as err:
-            logger.critical('Preset settings incomplete or incorrect')
+            logger.critical("Preset settings incomplete or incorrect")
             raise err
-        debug.lv5(f'Preset module imported: {modpath}')
+        debug.lv5(f"Preset module imported: {modpath}")
 
-        self.settings['modpath'] = modpath
+        self.settings["modpath"] = modpath
         if scenario:
-            debug.lv5(f'Using scenario: {scenario}')
-            self.settings['scenario'] = scenario
+            debug.lv5(f"Using scenario: {scenario}")
+            self.settings["scenario"] = scenario
         if tmpdir:
-            debug.lv5(f'Using tmpdir: {tmpdir}')
-            self.settings['tmpdir'] = tmpdir
+            debug.lv5(f"Using tmpdir: {tmpdir}")
+            self.settings["tmpdir"] = tmpdir
 
         #: The Elasticsearch client object
         self.client = client
@@ -111,14 +111,14 @@ class TestBed:
     def _erase(self, kind: str, lst: t.Sequence[str]) -> None:
         overall_success = True
         if not lst:
-            debug.lv3(f'{kind}: nothing to delete.')
+            debug.lv3(f"{kind}: nothing to delete.")
             return True
-        if kind == 'ilm':  # ILM policies can't be batch deleted
+        if kind == "ilm":  # ILM policies can't be batch deleted
             ilm = [self._while(kind, x) for x in lst]
             overall_success = False not in ilm  # No False values == True
         else:
-            overall_success = self._while(kind, ','.join(lst))
-        debug.lv5(f'Return value = {overall_success}')
+            overall_success = self._while(kind, ",".join(lst))
+        debug.lv5(f"Return value = {overall_success}")
         return overall_success
 
     @begin_end()
@@ -126,12 +126,12 @@ class TestBed:
         self,
     ) -> t.Generator[str, t.Sequence[str], None]:
         """Method to delete everything matching our pattern(s)"""
-        items = ['index', 'data_stream', 'snapshot', 'template', 'component', 'ilm']
+        items = ["index", "data_stream", "snapshot", "template", "component", "ilm"]
         for i in items:
-            if i == 'snapshot' and self.plan.repository is None:
-                debug.lv4('No repository, no snapshots.')
+            if i == "snapshot" and self.plan.repository is None:
+                debug.lv4("No repository, no snapshots.")
                 continue
-            pattern = f'*{self.plan.prefix}-{NAMEMAPPER[i]}-{self.plan.uniq}*'
+            pattern = f"*{self.plan.prefix}-{NAMEMAPPER[i]}-{self.plan.uniq}*"
             entities = get(self.client, i, pattern, repository=self.plan.repository)
             yield (i, entities)
 
@@ -154,7 +154,7 @@ class TestBed:
         if not success:
             logger.warning(
                 f'Failed to delete "{item}" after {count - 1} tries. '
-                f'Final error: {exc}'
+                f"Final error: {exc}"
             )
         return success
 
@@ -163,38 +163,38 @@ class TestBed:
         """
         Get current ILM polling settings and store them in self.plan.polling_interval
         """
-        debug.lv3('Storing current ILM polling settings, if any...')
+        debug.lv3("Storing current ILM polling settings, if any...")
         try:
-            debug.lv4('TRY: Getting cluster settings')
+            debug.lv4("TRY: Getting cluster settings")
             res = dict(self.client.cluster.get_settings())
-            debug.lv5(f'Cluster settings: {prettystr(res)}')
+            debug.lv5(f"Cluster settings: {prettystr(res)}")
         except Exception as err:
-            logger.critical('Unable to get persistent cluster settings')
-            logger.critical('This could be permissions, or something larger.')
-            logger.critical(f'Exception: {prettystr(err)}')
-            logger.critical('Exiting.')
+            logger.critical("Unable to get persistent cluster settings")
+            logger.critical("This could be permissions, or something larger.")
+            logger.critical(f"Exception: {prettystr(err)}")
+            logger.critical("Exiting.")
             raise err
         try:
-            debug.lv4('TRY: Getting ILM Polling Interval from settings')
-            retval = res['persistent']['indices']['lifecycle']['poll_interval']
+            debug.lv4("TRY: Getting ILM Polling Interval from settings")
+            retval = res["persistent"]["indices"]["lifecycle"]["poll_interval"]
         except KeyError:
-            debug.lv3('No setting for indices.lifecycle.poll_interval. Must be default')
+            debug.lv3("No setting for indices.lifecycle.poll_interval. Must be default")
             retval = None  # Must be an actual value to go into a DotMap
-        if retval == '1s':
+        if retval == "1s":
             msg = (
-                'ILM polling already set at 1s. A previous run most likely did not '
-                'tear down properly. Resetting to null after this run'
+                "ILM polling already set at 1s. A previous run most likely did not "
+                "tear down properly. Resetting to null after this run"
             )
             logger.warning(msg)
             retval = None  # Must be an actual value to go into a DotMap
         self.plan.ilm_polling_interval = retval
-        debug.lv3(f'Stored ILM Polling Interval: {retval}')
+        debug.lv3(f"Stored ILM Polling Interval: {retval}")
 
     @begin_end()
     def ilm_polling(self, interval: t.Union[str, None] = None) -> t.Dict:
         """Return persistent cluster settings to speed up ILM polling during testing"""
-        retval = {'indices.lifecycle.poll_interval': interval}
-        debug.lv5(f'Return value = {retval}')
+        retval = {"indices.lifecycle.poll_interval": interval}
+        debug.lv5(f"Return value = {retval}")
         return retval
 
     @begin_end()
@@ -205,17 +205,17 @@ class TestBed:
         self.plan = PlanBuilder(settings=self.settings).plan
         self.get_ilm_polling()
         debug.lv5(f'Setting: {self.ilm_polling(interval="1s")}')
-        self.client.cluster.put_settings(persistent=self.ilm_polling(interval='1s'))
+        self.client.cluster.put_settings(persistent=self.ilm_polling(interval="1s"))
         self.setup_entitymgrs()
         end = datetime.now(timezone.utc)
-        debug.lv1(f'Testbed setup elapsed time: {(end - start).total_seconds()}')
+        debug.lv1(f"Testbed setup elapsed time: {(end - start).total_seconds()}")
 
     @begin_end()
     def setup_entitymgrs(self) -> None:
         """
         Setup each EntityMgr child class
         """
-        kw = {'client': self.client, 'plan': self.plan}
+        kw = {"client": self.client, "plan": self.plan}
 
         self.ilmmgr = IlmMgr(**kw)
         self.ilmmgr.setup()
@@ -225,10 +225,10 @@ class TestBed:
         self.templatemgr.setup()
         self.snapshotmgr = SnapshotMgr(**kw)
         self.snapshotmgr.setup()
-        if self.plan.type == 'indices':
+        if self.plan.type == "indices":
             self.indexmgr = IndexMgr(**kw, snapmgr=self.snapshotmgr)
             self.indexmgr.setup()
-        if self.plan.type == 'data_stream':
+        if self.plan.type == "data_stream":
             self.data_streammgr = DataStreamMgr(**kw, snapmgr=self.snapshotmgr)
             self.data_streammgr.setup()
 
@@ -238,21 +238,21 @@ class TestBed:
         start = datetime.now(timezone.utc)
         successful = True
         if self.plan.tmpdir:
-            debug.lv3(f'Removing tmpdir: {self.plan.tmpdir}')
+            debug.lv3(f"Removing tmpdir: {self.plan.tmpdir}")
             rmtree(self.plan.tmpdir)  # Remove the tmpdir stored here
         for kind, list_of_kind in self._erase_all():
             if not self._erase(kind, list_of_kind):
                 successful = False
         persist = self.ilm_polling(interval=self.plan.ilm_polling_interval)
         debug.lv3(
-            f'Restoring ILM polling to previous value: '
-            f'{self.plan.ilm_polling_interval}'
+            f"Restoring ILM polling to previous value: "
+            f"{self.plan.ilm_polling_interval}"
         )
         self.client.cluster.put_settings(persistent=persist)
         end = datetime.now(timezone.utc)
-        debug.lv1(f'Testbed teardown elapsed time: {(end - start).total_seconds()}')
+        debug.lv1(f"Testbed teardown elapsed time: {(end - start).total_seconds()}")
         if successful:
-            logger.info('Cleanup successful')
+            logger.info("Cleanup successful")
         else:
-            logger.error('Cleanup was unsuccessful/incomplete')
+            logger.error("Cleanup was unsuccessful/incomplete")
         self.plan.cleanup = successful
