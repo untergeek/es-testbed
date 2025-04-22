@@ -5,7 +5,7 @@ from es_testbed._base import TestBed
 from es_testbed._plan import PlanBuilder
 from es_testbed.debug import debug
 
-__version__ = "0.11.2"
+__version__ = "0.11.3"
 
 FIRST_YEAR = 2025
 now = datetime.now()
