@@ -5,13 +5,13 @@ import pytest
 from es_testbed import TestBed
 from es_testbed.presets.searchable_test.definitions import get_plan
 
-INDEX1: str = 'index1'
+INDEX1: str = "index1"
 """Default index name for testing."""
 
 SETTINGS: dict = {
-    'index': {
-        'number_of_shards': 1,
-        'number_of_replicas': 0,
+    "index": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
     },
 }
 """Default index settings for testing."""
@@ -23,28 +23,28 @@ logger = logging.getLogger(__name__)
 
 def get_kind(scenario) -> str:
     """Return the searchable snapshot tier for the test based on plan"""
-    return get_plan(scenario=scenario)['type']
+    return get_plan(scenario=scenario)["type"]
 
 
 def get_sstier(scenario) -> str:
     """Return the searchable snapshot tier for the test based on plan"""
     plan = get_plan(scenario=scenario)
     tiers = set()
-    for scheme in plan['index_buildlist']:
-        if 'target_tier' in scheme:
-            if scheme['target_tier'] in ['cold', 'frozen']:
-                tiers.add(scheme['target_tier'])
-    if 'ilm' in plan:
-        if 'phases' in plan['ilm']:
-            for phase in ['cold', 'frozen']:
-                if phase in plan['ilm']['phases']:
+    for scheme in plan["index_buildlist"]:
+        if "target_tier" in scheme:
+            if scheme["target_tier"] in ["cold", "frozen"]:
+                tiers.add(scheme["target_tier"])
+    if "ilm" in plan:
+        if "phases" in plan["ilm"]:
+            for phase in ["cold", "frozen"]:
+                if phase in plan["ilm"]["phases"]:
                     tiers.add(phase)
     if len(tiers) > 1:
-        raise ValueError('Both cold and frozen tiers specified for this scenario!')
+        raise ValueError("Both cold and frozen tiers specified for this scenario!")
     if tiers:
         retval = list(tiers)[0]  # There can be only one...
     else:
-        retval = 'hot'
+        retval = "hot"
     return retval
 
 
@@ -60,10 +60,10 @@ class TestAny:
     @pytest.fixture(scope="class")
     def tb(self, client, prefix, uniq, skip_no_repo):  # skip_localhost fixed?
         """TestBed setup/teardown"""
-        skip_no_repo(get_sstier(self.scenario) in ['cold', 'frozen'])
-        teebee = TestBed(client, builtin='searchable_test', scenario=self.scenario)
-        teebee.settings['prefix'] = prefix
-        teebee.settings['uniq'] = uniq
+        skip_no_repo(get_sstier(self.scenario) in ["cold", "frozen"])
+        teebee = TestBed(client, builtin="searchable_test", scenario=self.scenario)
+        teebee.settings["prefix"] = prefix
+        teebee.settings["uniq"] = uniq
         teebee.setup()
         yield teebee
         teebee.teardown()
@@ -80,24 +80,24 @@ class TestAny:
         """
         expected = rollovername(tb.plan)
         actual = actual_rollover(tb)
-        logger.debug('expected = %s', expected)
-        logger.debug('actual = %s', actual)
+        logger.debug("expected = %s", expected)
+        logger.debug("actual = %s", actual)
         assert actual == expected
 
     def test_first_index(self, actual_index, first, index_name, tb):
         """Assert that the first index matches the expected name"""
         expected = index_name(which=first, plan=tb.plan, tier=get_sstier(self.scenario))
         actual = actual_index(tb, first)
-        logger.debug('expected = %s', expected)
-        logger.debug('actual = %s', actual)
+        logger.debug("expected = %s", expected)
+        logger.debug("actual = %s", actual)
         assert actual == expected
 
     def test_last_index(self, actual_index, index_name, last, tb):
         """Assert that the last index matches the expected name"""
         expected = index_name(which=last, plan=tb.plan, tier=get_sstier(self.scenario))
         actual = actual_index(tb, last)
-        logger.debug('expected = %s', expected)
-        logger.debug('actual = %s', actual)
+        logger.debug("expected = %s", expected)
+        logger.debug("actual = %s", actual)
         assert actual == expected
 
     def test_write_index(self, tb, actual_write_index, write_index_name):
@@ -108,8 +108,8 @@ class TestAny:
         """
         expected = write_index_name(plan=tb.plan, tier=get_sstier(self.scenario))
         actual = actual_write_index(tb)
-        logger.debug('expected = %s', expected)
-        logger.debug('actual = %s', actual)
+        logger.debug("expected = %s", expected)
+        logger.debug("actual = %s", actual)
         assert actual == expected
 
     def test_index_template(self, tb, components, get_template, template):
@@ -118,4 +118,4 @@ class TestAny:
         assert tb.templatemgr.last == template
         result = get_template(tb.client)
         assert len(result) == 1
-        assert result[0]['index_template']['composed_of'] == components
+        assert result[0]["index_template"]["composed_of"] == components

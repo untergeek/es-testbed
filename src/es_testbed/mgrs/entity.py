@@ -11,13 +11,13 @@ if t.TYPE_CHECKING:
 class EntityMgr:
     """Entity Manager Parent Class"""
 
-    kind = 'entity_type'
-    listname = 'entity_mgrs'
+    kind = "entity_type"
+    listname = "entity_mgrs"
 
     def __init__(
         self,
-        client: t.Union['Elasticsearch', None] = None,
-        plan: t.Union['DotMap', None] = None,
+        client: t.Union["Elasticsearch", None] = None,
+        plan: t.Union["DotMap", None] = None,
     ):
         self.client = client
         self.plan = plan
@@ -34,7 +34,7 @@ class EntityMgr:
     @property
     def entity_root(self) -> str:
         """The entity root name builder"""
-        return f'{self.plan.prefix}-{self.ident()}-{self.plan.uniq}'
+        return f"{self.plan.prefix}-{self.ident()}-{self.plan.uniq}"
 
     @property
     def indexlist(self) -> t.Sequence[str]:
@@ -49,17 +49,17 @@ class EntityMgr:
     @property
     def name(self) -> str:
         """Return the full, incrementing name of a not yet appended entity"""
-        return f'{self.entity_root}{self.suffix}'
+        return f"{self.entity_root}{self.suffix}"
 
     @property
     def pattern(self) -> str:
         """Return the search pattern for the managed entity"""
-        return f'*{self.entity_root}*'
+        return f"*{self.entity_root}*"
 
     @property
     def suffix(self) -> str:
         """Return the incrementing index suffix"""
-        return f'-{len(self.entity_list) + 1:06}'
+        return f"-{len(self.entity_list) + 1:06}"
 
     def appender(self, name: str) -> None:
         """Append an item to entity_list"""

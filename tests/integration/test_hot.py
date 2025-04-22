@@ -6,16 +6,16 @@ from . import TestAny
 class TestDataStream(TestAny):
     """TestDataStream"""
 
-    scenario = 'hot_ds'
+    scenario = "hot_ds"
 
 
 class TestIndices(TestAny):
     """TestIndices"""
 
-    scenario = 'hot'
+    scenario = "hot"
 
 
 class TestRolloverIndices(TestAny):
     """TestRolloverIndices"""
 
-    scenario = 'hot_rollover'
+    scenario = "hot_rollover"

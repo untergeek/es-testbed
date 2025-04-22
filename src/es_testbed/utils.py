@@ -27,21 +27,21 @@ def build_ilm_phase(
 ) -> t.Dict:
     """Build a single ILM policy step based on phase"""
     retval = ilm_phase(phase)
-    if phase in ['cold', 'frozen']:
+    if phase in ["cold", "frozen"]:
         if repo:
-            retval[phase]['actions']['searchable_snapshot'] = {
-                'snapshot_repository': repo,
-                'force_merge_index': fm,
+            retval[phase]["actions"]["searchable_snapshot"] = {
+                "snapshot_repository": repo,
+                "force_merge_index": fm,
             }
         else:
             msg = (
-                f'Unable to build {phase} ILM phase. Value for repository not '
-                f'provided'
+                f"Unable to build {phase} ILM phase. Value for repository not "
+                f"provided"
             )
             raise TestbedMisconfig(msg)
     if actions:
-        retval[phase]['actions'].update(actions)
-    debug.lv5(f'Return value = {retval}')
+        retval[phase]["actions"].update(actions)
+    debug.lv5(f"Return value = {retval}")
     return retval
 
 
@@ -58,10 +58,10 @@ def build_ilm_policy(
     Put forcemerge in the last phase before cold or frozen (whichever comes first)
     """
     if not phases:
-        phases = ['hot', 'delete']
+        phases = ["hot", "delete"]
     retval = {}
-    if ('cold' in phases or 'frozen' in phases) and not repository:
-        raise TestbedMisconfig('Cannot build cold or frozen phase without repository')
+    if ("cold" in phases or "frozen" in phases) and not repository:
+        raise TestbedMisconfig("Cannot build cold or frozen phase without repository")
     for phase in phases:
         actions = None
         if readonly == phase:
@@ -69,24 +69,24 @@ def build_ilm_policy(
         phase = build_ilm_phase(phase, repo=repository, fm=forcemerge, actions=actions)
         retval.update(phase)
     if forcemerge:
-        retval['hot']['actions'].update(
+        retval["hot"]["actions"].update(
             ilm_force_merge(max_num_segments=max_num_segments)
         )
-    debug.lv5("Value = {'phases': " + f'{retval}' + "}")
-    return {'phases': retval}
+    debug.lv5("Value = {'phases': " + f"{retval}" + "}")
+    return {"phases": retval}
 
 
 @begin_end()
-def get_routing(tier='hot') -> t.Dict:
+def get_routing(tier="hot") -> t.Dict:
     """Return the routing allocation tier preference"""
     try:
-        debug.lv4(f'Checking for tier: {tier}')
-        pref = TIER[tier]['pref']
+        debug.lv4(f"Checking for tier: {tier}")
+        pref = TIER[tier]["pref"]
     except KeyError:
         # Fallback value
-        pref = 'data_content'
-    retval = {'index.routing.allocation.include._tier_preference': pref}
-    debug.lv5(f'Return value = {retval}')
+        pref = "data_content"
+    retval = {"index.routing.allocation.include._tier_preference": pref}
+    debug.lv5(f"Return value = {retval}")
     return retval
 
 
@@ -113,21 +113,21 @@ def iso8601_now() -> str:
     #
     # We are MANUALLY, FORCEFULLY declaring timezone.utc, so it should ALWAYS be
     # +00:00, but could in theory sometime show up as a Z, so we test for that.
-    parts = datetime.datetime.now(datetime.timezone.utc).isoformat().split('+')
+    parts = datetime.datetime.now(datetime.timezone.utc).isoformat().split("+")
     if len(parts) == 1:
-        if parts[0][-1] == 'Z':
+        if parts[0][-1] == "Z":
             return parts[0]  # Our ISO8601 already ends with a Z for Zulu/UTC time
-        return f'{parts[0]}Z'  # It doesn't end with a Z so we put one there
-    if parts[1] == '00:00':
-        return f'{parts[0]}Z'  # It doesn't end with a Z so we put one there
-    return f'{parts[0]}+{parts[1]}'  # Fallback publishes the +TZ, whatever that was
+        return f"{parts[0]}Z"  # It doesn't end with a Z so we put one there
+    if parts[1] == "00:00":
+        return f"{parts[0]}Z"  # It doesn't end with a Z so we put one there
+    return f"{parts[0]}+{parts[1]}"  # Fallback publishes the +TZ, whatever that was
 
 
 @begin_end()
 def mounted_name(index: str, tier: str):
     """Return a value for renamed_index for mounting a searchable snapshot index"""
     retval = f'{TIER[tier]["prefix"]}-{index}'
-    debug.lv5(f'Return value = {retval}')
+    debug.lv5(f"Return value = {retval}")
     return retval
 
 
@@ -145,16 +145,16 @@ def prettystr(*args, **kwargs) -> str:
     3.10 and up, so there is a test here to add it when that is the case.
     """
     defaults = [
-        ('indent', 2),
-        ('width', 80),
-        ('depth', None),
-        ('compact', False),
-        ('sort_dicts', False),
+        ("indent", 2),
+        ("width", 80),
+        ("depth", None),
+        ("compact", False),
+        ("sort_dicts", False),
     ]
     vinfo = python_version()
     if vinfo[0] == 3 and vinfo[1] >= 10:
         # underscore_numbers only works in 3.10 and up
-        defaults.append(('underscore_numbers', False))
+        defaults.append(("underscore_numbers", False))
     kw = {}
     for tup in defaults:
         key, default = tup
@@ -180,24 +180,24 @@ def process_preset(
     modpath = None
     tmpdir = None
     if builtin:  # Overrides any other options
-        modpath = f'es_testbed.presets.{builtin}'
+        modpath = f"es_testbed.presets.{builtin}"
     else:
         trygit = False
         try:
-            debug.lv4('TRY: Checking for git preset')
-            kw = {'path': path, 'ref': ref, 'url': url}
+            debug.lv4("TRY: Checking for git preset")
+            kw = {"path": path, "ref": ref, "url": url}
             raise_on_none(**kw)
             trygit = True  # We have all 3 kwargs necessary for git
         except ValueError as resp:  # Not able to do a git preset
-            debug.lv1(f'Unable to import a git-based preset: {resp}')
+            debug.lv1(f"Unable to import a git-based preset: {resp}")
         if trygit:  # Trying a git import
             tmpdir = mkdtemp()
             try:
-                debug.lv4('TRY: Attempting to clone git repository')
+                debug.lv4("TRY: Attempting to clone git repository")
                 _ = Repo.clone_from(url, tmpdir, branch=ref, depth=1)
                 filepath = Path(tmpdir) / path
             except Exception as err:
-                logger.error(f'Git clone failed: {err}')
+                logger.error(f"Git clone failed: {err}")
                 rmtree(tmpdir)  # Clean up after failed attempt
                 raise err
         filepath = Path(path)  # It should work even if path is None
@@ -207,7 +207,7 @@ def process_preset(
         parent = filepath.parent.resolve()  # Up one level
         # We now make the parent path part of the sys.path.
         sys.path.insert(0, parent)  # This should persist beyond this module
-    debug.lv5(f'Return value = ({modpath}, {tmpdir})')
+    debug.lv5(f"Return value = ({modpath}, {tmpdir})")
     return modpath, tmpdir
 
 
@@ -218,7 +218,7 @@ def python_version() -> t.Tuple:
     """
     _ = sys.version_info
     retval = (_[0], _[1], _[2])
-    debug.lv5(f'Return value = {retval}')
+    debug.lv5(f"Return value = {retval}")
     return retval
 
 
@@ -227,7 +227,7 @@ def raise_on_none(**kwargs):
     """Raise if any kwargs have a None value"""
     for key, value in kwargs.items():
         if value is None:
-            debug.lv3('Exiting function, raising ValueError')
+            debug.lv3("Exiting function, raising ValueError")
             raise ValueError(f'kwarg "{key}" cannot have a None value')
 
 
@@ -237,8 +237,8 @@ def randomstr(length: int = 16, lowercase: bool = False) -> str:
     letters = string.ascii_uppercase
     if lowercase:
         letters = string.ascii_lowercase
-    retval = str(''.join(random.choices(letters + string.digits, k=length)))
-    debug.lv5(f'Return value = {retval}')
+    retval = str("".join(random.choices(letters + string.digits, k=length)))
+    debug.lv5(f"Return value = {retval}")
     return retval
 
 
@@ -246,5 +246,5 @@ def randomstr(length: int = 16, lowercase: bool = False) -> str:
 def storage_type(tier: str) -> t.Dict:
     """Return the storage type of a searchable snapshot by tier"""
     retval = TIER[tier]["storage"]
-    debug.lv5(f'Return value = {retval}')
+    debug.lv5(f"Return value = {retval}")
     return retval

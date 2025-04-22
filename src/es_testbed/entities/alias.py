@@ -18,12 +18,12 @@ class Alias(Entity):
 
     def __init__(
         self,
-        client: 'Elasticsearch',
+        client: "Elasticsearch",
         name: t.Union[str, None] = None,
     ):
-        debug.lv2('Initializing Alias entity object...')
+        debug.lv2("Initializing Alias entity object...")
         super().__init__(client=client, name=name)
-        debug.lv3('Alias entity object initialized')
+        debug.lv3("Alias entity object initialized")
 
     @begin_end()
     def rollover(self) -> None:
@@ -34,18 +34,18 @@ class Alias(Entity):
     def verify(self, index_list: t.Sequence[str]) -> bool:
         retval = False
         res = resolver(self.client, self.name)
-        debug.lv5(f'resolver response: {prettystr(res)}')
-        for idx, alias in enumerate(res['aliases']):
-            if alias['name'] == self.name:
+        debug.lv5(f"resolver response: {prettystr(res)}")
+        for idx, alias in enumerate(res["aliases"]):
+            if alias["name"] == self.name:
                 debug.lv3(
-                    f'Confirm list index position [{idx}] match of alias '
-                    f'{prettystr(alias)}'
+                    f"Confirm list index position [{idx}] match of alias "
+                    f"{prettystr(alias)}"
                 )
             else:
                 continue
-            if alias['indices'] == index_list:
-                debug.lv3(f'Confirm match of indices backed by alias {self.name}')
+            if alias["indices"] == index_list:
+                debug.lv3(f"Confirm match of indices backed by alias {self.name}")
                 retval = True
                 break
-        debug.lv5(f'Return value = {retval}')
+        debug.lv5(f"Return value = {retval}")
         return retval

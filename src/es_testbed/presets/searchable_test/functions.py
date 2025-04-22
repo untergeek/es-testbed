@@ -35,14 +35,14 @@ def iso8601_now() -> str:
     +00:00, but could in theory sometime show up as a Z, so we test for that.
     """
 
-    parts = datetime.now(timezone.utc).isoformat().split('+')
+    parts = datetime.now(timezone.utc).isoformat().split("+")
     if len(parts) == 1:
-        if parts[0][-1] == 'Z':
+        if parts[0][-1] == "Z":
             return parts[0]  # _______ It already ends with a Z for Zulu/UTC time
-        return f'{parts[0]}Z'  # _____ It doesn't end with a Z so we put one there
-    if parts[1] == '00:00':
-        return f'{parts[0]}Z'  # _____ It doesn't end with a Z so we put one there
-    return f'{parts[0]}+{parts[1]}'  # Fallback publishes the +TZ, whatever that was
+        return f"{parts[0]}Z"  # _____ It doesn't end with a Z so we put one there
+    if parts[1] == "00:00":
+        return f"{parts[0]}Z"  # _____ It doesn't end with a Z so we put one there
+    return f"{parts[0]}+{parts[1]}"  # Fallback publishes the +TZ, whatever that was
 
 
 def randomstr(length: int = 16, lowercase: bool = False) -> str:
@@ -54,7 +54,7 @@ def randomstr(length: int = 16, lowercase: bool = False) -> str:
     letters = string.ascii_uppercase
     if lowercase:
         letters = string.ascii_lowercase
-    return str(''.join(random.choices(letters + string.digits, k=length)))
+    return str("".join(random.choices(letters + string.digits, k=length)))
 
 
 def doc_generator(
@@ -68,7 +68,7 @@ def doc_generator(
         match is True, a random value between 1001 and 32767 if False)
     :returns: A generator shipping docs
     """
-    keys = ['message', 'nested', 'deep']
+    keys = ["message", "nested", "deep"]
     # Start with an empty map
     matchmap = {}
     # Iterate over each key
@@ -84,11 +84,11 @@ def doc_generator(
     # This is where count and start_at matter
     for num in range(start_at, start_at + count):
         yield {
-            '@timestamp': iso8601_now(),
-            'message': f'{matchmap["message"]}{num}',  # message# or randomstr#
-            'number': (
+            "@timestamp": iso8601_now(),
+            "message": f'{matchmap["message"]}{num}',  # message# or randomstr#
+            "number": (
                 num if match else random.randint(1001, 32767)
             ),  # value of num or random int
-            'nested': {'key': f'{matchmap["nested"]}{num}'},  # nested#
-            'deep': {'l1': {'l2': {'l3': f'{matchmap["deep"]}{num}'}}},  # deep#
+            "nested": {"key": f'{matchmap["nested"]}{num}'},  # nested#
+            "deep": {"l1": {"l2": {"l3": f'{matchmap["deep"]}{num}'}}},  # deep#
         }
